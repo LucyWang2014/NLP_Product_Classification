@@ -27,6 +27,13 @@ tokenizer_cmd = ['./mosesdecoder/scripts/tokenizer/tokenizer.perl', '-l', 'en', 
 
 
 def tokenize(sentences):
+    """
+    Tokenizes sentences by removing irrelevant punctuation, etc.
+    Uses the mosesdecoder in some way.
+
+    Args:
+        sentences: list of sentences
+    """
 
     print 'Tokenizing..',
     text = "\n".join(sentences)
@@ -39,6 +46,17 @@ def tokenize(sentences):
 
 
 def build_dict(path):
+    """
+    Build dictionary
+
+    Args:
+        path: (string) path of training csv
+
+    Returns:
+        worddict: dictionary
+        cat_1_dict
+        cat_2_dict
+    """
     train_df = pd.read_csv(path,header = 0, index_col = 0,low_memory = False)
 
     cat_1 = list(train_df.cat_1.astype(str))
@@ -152,9 +170,12 @@ def grab_data(path, dictionary):
 
 def main():
     # Get the dataset from http://ai.stanford.edu/~amaas/data/sentiment/
-    folder_path = '/Users/LittleLucy/Google Drive/MSDS/2015Fall/DSGA3001_NLP_Distributed_Representation/Project/'
+    #folder_path = '/Users/LittleLucy/Google Drive/MSDS/2015Fall/DSGA3001_NLP_Distributed_Representation/Project/'
 
-    dataset_path=folder_path + 'data/'
+    '''
+    Let's use relative paths instead, so we don't have to switch back and forth depending on the machine.
+    '''
+    dataset_path='data/'
 
     dictionary,cat_1_dict, cat_2_dict = build_dict(dataset_path + 'train_set.csv')
 

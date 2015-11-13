@@ -33,6 +33,9 @@ def tokenize(sentences):
 
     Args:
         sentences: list of sentences
+
+    Returns:
+        toks: list of tokens?
     """
 
     print 'Tokenizing..',
@@ -47,32 +50,36 @@ def tokenize(sentences):
 
 def build_dict(path):
     """
-    Build dictionary
+    Get word counts from the descriptions
+    Get counts by category level 1
+    Get counts by category level 2
 
     Args:
         path: (string) path of training csv
 
     Returns:
-        worddict: dictionary
-        cat_1_dict
-        cat_2_dict
+        worddict: dict of word and word count
+        cat_1_dict: dict of category with counts for each
+        cat_2_dict: dict of category with counts for each
     """
     train_df = pd.read_csv(path,header = 0, index_col = 0,low_memory = False)
 
     cat_1 = list(train_df.cat_1.astype(str))
     cat_2 = list(train_df.cat_2.astype(str))
 
-    descriptions = list(train_df.description_clean.astype(str) + 
+    descriptions = list(train_df.description_clean.astype(str) + " " +
                     train_df.brand.astype(str))
 
 
+    print "Tokenizing descriptions..."
     descriptions = tokenize(descriptions)
     #cat_1 = tokenize(cat_1)
     #cat_2 = tokenize(cat_2)
+    print "Done"
 
     #pdb.set_trace()
 
-    print 'Building dictionary..',
+    print 'Getting descriptions word count..',
     wordcount = dict()
     for ss in descriptions:
         words = ss.strip().lower().split()
@@ -82,21 +89,29 @@ def build_dict(path):
                 wordcount[w] = 1
             else:
                 wordcount[w] += 1
+    print 'Done'
 
+    print 'Getting cat 1 count...'
     cat_1_count = dict()
     for cat in cat_1:
         if cat not in cat_1_count:
             cat_1_count[cat] = 1
         else:
             cat_1_count[cat] += 1
+    print 'Done'
 
+
+    print 'Getting cat 2 count...'
     cat_2_count = dict()
     for cat in cat_2:
         if cat not in cat_1_count:
             cat_2_count[cat] = 1
         else:
             cat_2_count[cat] += 1
+    print 'Done'
 
+    #Combine dictionaries into one total count
+    #TODO: may create duplicates
     totalcount = wordcount.copy()
     totalcount.update(cat_1_count)
     totalcount.update(cat_2_count)
@@ -139,13 +154,28 @@ def build_dict(path):
 
 
 def grab_data(path, dictionary):
+    """
+    Grabs data
+    args:
+        path: path to csv data file
+        dictionary: word dictionary file
+
+    returns:
+        seqs: concatenation of description and brand name, converted to word indexes
+        cat_1, cat_2: tuples.  lookup from number index to dictionary index
+        label_1, label_2, label_3: number index (not dictionary index) of the three levels of labels
+    """
 
     data = pd.read_csv(path,index_col = 0, header = 0,low_memory=False)
 
+    # 'sentences' combines the description with the brand name
+    #TODO: why does this often produce bigrams with periods in between?
+    # And does this preserve distinction between documents?
     sentences = list(data.description_clean.astype(str) + 
         data.brand.astype(str))
 
     sentences = tokenize(sentences)
+    print "sentence type",type(sentences)
 
     seqs = [None] * len(sentences) 
 
@@ -156,7 +186,7 @@ def grab_data(path, dictionary):
     cat_1 = []
     cat_2 = []
     for l_1,l_2 in zip(data.cat_1,data.cat_2):
-        cat_1.append(dictionary[str(l_1)])
+        cat_1.append(dictionary[str(l_1)]) #TODO: should this be cat_1_dict?
         cat_2.append(dictionary[str(l_2)])
 
     cat_1 = zip(data.cat_1_num,cat_1)
@@ -175,13 +205,23 @@ def main():
     '''
     Let's use relative paths instead, so we don't have to switch back and forth depending on the machine.
     '''
-    dataset_path='data/'
+    #dataset_path='data/'
+    home = os.path.join(os.path.dirname(__file__),'..')
+    print "file",__file__
+    dataset_path = os.path.join(home,'data') + '/'
+    print "home",home
+    print "dataset_path",dataset_path
 
     dictionary,cat_1_dict, cat_2_dict = build_dict(dataset_path + 'train_set.csv')
 
     train_x, train_cat_1, train_cat_2, train_y_1, train_y_2, train_y_3 = grab_data(dataset_path+'train_set.csv', dictionary)
 
     test_x, test_cat_1, test_cat_2, test_y_1, test_y_2, test_y_3 = grab_data(dataset_path+'test_set.csv', dictionary)
+
+
+    #Create directory if not present
+    if not os.path.exists(dataset_path + 'encode_cats'):
+        os.makedirs(dataset_path + 'encode_cats')
 
     f = open(dataset_path + 'encode_cats/nordstrom_train.pkl', 'wb')
     pkl.dump((train_x, train_cat_1, train_cat_2, train_y_1, train_y_2, train_y_3), f, -1)

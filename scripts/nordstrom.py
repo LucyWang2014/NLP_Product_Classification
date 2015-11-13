@@ -9,11 +9,11 @@ import pdb
 def prepare_data(seqs, labels, maxlen=None):
     """Create the matrices from the datasets.
 
-    This pad each sequence to the same lenght: the lenght of the
+    This pad each sequence to the same length: the length of the
     longuest sequence or maxlen.
 
     if maxlen is set, we will cut all sequence to this maximum
-    lenght.
+    length.
 
     This swap the axis!
     """
@@ -87,7 +87,7 @@ def load_data(path="nordstrom", n_words=100000, valid_portion=0.1, maxlen=None,
     :type maxlen: None or positive int
     :param maxlen: the max sequence length we use in the train/valid set.
     :type sort_by_len: bool
-    :name sort_by_len: Sort by the sequence lenght for the train,
+    :name sort_by_len: Sort by the sequence length for the train,
         valid and test set. This allow faster execution as it cause
         less padding per minibatch. Another mechanism must be used to
         shuffle the train set at each epoch.

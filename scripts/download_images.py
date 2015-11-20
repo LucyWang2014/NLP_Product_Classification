@@ -32,13 +32,13 @@ def download_and_resize(url,idx,dataset,datadir,width=64,filetype='bmp'):
     
     if not os.path.isfile(outpath):
         print "getting image #%s..." %str(idx)
-        try:
-            img_file = cStringIO.StringIO(urllib.urlopen(url).read())
-            img = Image.open(img_file)
-            resized = img.thumbnail((width,width), Image.ANTIALIAS)
-            img.save(outpath)
-        except:
-            print "unable to download"
+        #try:
+        img_file = cStringIO.StringIO(urllib.urlopen(url).read())
+        img = Image.open(img_file)
+        resized = img.thumbnail((width,width), Image.ANTIALIAS)
+        img.save(outpath)
+       # except:
+        #    print "unable to download"
     else:
         print "image # %s already downloaded" %str(idx)
 
@@ -63,11 +63,14 @@ def get_selected_images(csv_path,first_idx,last_idx,dataset,datadir,width=64,fil
 def main(first_idx,last_idx):
     start_time = datetime.now()
 
-    home = os.path.join(os.getcwd(),'..')
-    datadir = os.path.join(home,'data') + '/'
-    inpath = datadir + 'train_set.csv'
+    home = os.path.join(os.path.dirname(__file__),'..')
+    #datadir = os.path.join(home,'data') + '/'
     
-    get_selected_images(data,first_idx,last_idx,'train',datadir)
+    #hpc datadir
+    datadir = '/scratch/cdg356/spring/data/'
+    csv_path = datadir + 'train_set.csv'
+    
+    get_selected_images(csv_path,first_idx,last_idx,'train',datadir)
     
     end_time = datetime.now()
     runtime = end_time - start_time

@@ -53,23 +53,30 @@ def add_all_images(datadir,infile_name,outfile_name,width=64):
     imageDF = pd.DataFrame(textDF.large_image_URL.apply(download_and_resize_image,args=(width,)))
     with open(datadir + outfile_name, 'wb') as outf:
         pkl.dump(imageDF,outf)
-    imageDF.to_csv(datadir + outfile_name+'.csv')
+    #imageDF.to_csv(datadir + outfile_name + '.csv')
     return textDF,imageDF
 
-def main():
+def main(infile_name, outfile_name):
     start_time = datetime.now()
 
     HOME = os.path.join(os.getcwd(),'..')
-    DATADIR = os.path.join(HOME,'data') + '/'
-    INFILE = 'head_train_set.csv'
-    OUTFILE = 'head_train_images.pkl'
+    
+    #Local machine
+    #DATADIR = os.path.join(HOME,'data') + '/'
+    #HPC Datadir
+    DATADIR = '/scratch/cdg356/spring/data/'
 
     #get all the images
-    add_all_images(DATADIR,INFILE,OUTFILE)
+    add_all_images(DATADIR,infile_name,outfile_name)
     
     end_time = datetime.now()
     runtime = end_time - start_time
     print "Script took",runtime
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv)<3:
+        print 'usage: python download_images_to_file.py "infile_name.csv" "outfile_name.pkl"'
+    else:
+        infile_name = sys.argv[1]
+        outfile_name = sys.argv[2]
+        main(infile_name,outfile_name)

@@ -6,7 +6,20 @@ import numpy
 import theano
 import pdb
 
-def prepare_data(seqs, labels, maxlen=None):
+def one_hot_encode_features(data, n_values = None):
+
+    if n_values is None:
+        n_values = max(data) + 1
+    n_samples = len(data)
+
+    encoded_features = numpy.zeros((n_samples,n_values)).astype('int64')
+
+    for idx, i in enumerate(data):
+        encoded_features[idx][i] = 1
+
+    return encoded_features
+
+def prepare_data(seqs, labels, maxlen=None, **kwargs):
     """Create the matrices from the datasets.
 
     This pad each sequence to the same length: the length of the
@@ -15,11 +28,14 @@ def prepare_data(seqs, labels, maxlen=None):
     if maxlen is set, we will cut all sequence to this maximum
     length.
 
+    add_feature is a list of features to be tagged on
+
     This swap the axis!
+
     """
-    # x: a list of sentences
+
     lengths = [len(s) for s in seqs]
-    #pdb.set_trace()
+
     if maxlen is not None:
         new_seqs = []
         new_labels = []
@@ -47,6 +63,18 @@ def prepare_data(seqs, labels, maxlen=None):
 
     return x, x_mask, labels
 
+def add_data(**kwargs):
+
+    add_features = []
+    for key, value in kwargs.iteritems():
+        if value is not None:
+            key = one_hot_encode_features(value)
+
+            add_features.append(key)
+
+    add_features = numpy.concatenate(tuple(add_features), axis = 1)
+
+    return add_features
 
 def get_dataset_file(dataset, default_dataset):
     '''Look for it as if it was a full path, if not, try local file,
@@ -108,61 +136,60 @@ def load_data(path="nordstrom", n_words=100000, valid_portion=0.1, maxlen=None,
     #else:
     f_train = open(path + '_train.pkl', 'rb')
     f_test = open(path + '_test.pkl', 'rb')
-    dictionary = open(path + '.dict.pkl','rb')
+    dictionary_f = open(path + '.dict.pkl','rb')
 
     train_set = cPickle.load(f_train)
     test_set = cPickle.load(f_test)
-    dictionary = cPickle.load(dictionary)
+    dictionary = cPickle.load(dictionary_f)
 
     f_train.close()
     f_test.close()
+    dictionary_f.close()
     
     if maxlen:
         new_train_set_x_1 = []
         new_train_set_x_2 = []
-        new_train_set_x_3 = []
         new_train_set_y_1 = []
         new_train_set_y_2 = []
         new_train_set_y_3 = []
-        for x_1, x_2, x_3, y_1,y_2,y_3 in zip(train_set[0], train_set[1],train_set[2],train_set[3],train_set[4],train_set[5]):
+        for x_1, x_2, y_1,y_2,y_3 in zip(train_set[0], train_set[1],train_set[2],train_set[3],train_set[4]):
             if len(x_1) < maxlen:
                 new_train_set_x_1.append(x_1)
                 new_train_set_x_2.append(x_2)
-                new_train_set_x_3.append(x_3)
                 new_train_set_y_1.append(y_1)
                 new_train_set_y_2.append(y_2)
                 new_train_set_y_3.append(y_3)
-        train_set = (new_train_set_x_1, new_train_set_x_2, new_train_set_x_3,new_train_set_y_1,new_train_set_y_2,new_train_set_y_3)
-        del new_train_set_x_1, new_train_set_x_2, new_train_set_x_3, new_train_set_y_1,new_train_set_y_2, new_train_set_y_3
+        train_set = (new_train_set_x_1, new_train_set_x_2, new_train_set_y_1,new_train_set_y_2,new_train_set_y_3)
+        del new_train_set_x_1, new_train_set_x_2, new_train_set_y_1,new_train_set_y_2, new_train_set_y_3
     
 
     # split training set into validation set
-    train_set_x_1, train_set_x_2, train_set_x_3, train_set_y_1, train_set_y_2, train_set_y_3 = train_set
+    train_set_x_1, train_set_x_2, train_set_y_1, train_set_y_2, train_set_y_3 = train_set
     n_samples = len(train_set_x_1)
     sidx = numpy.random.permutation(n_samples)
     n_train = int(numpy.round(n_samples * (1. - valid_portion)))
     valid_set_x_1 = [train_set_x_1[s] for s in sidx[n_train:]]
     valid_set_x_2 = [train_set_x_2[s] for s in sidx[n_train:]]
-    valid_set_x_3 = [train_set_x_3[s] for s in sidx[n_train:]]
+    #valid_set_x_3 = [train_set_x_3[s] for s in sidx[n_train:]]
     valid_set_y_1 = [train_set_y_1[s] for s in sidx[n_train:]]
     valid_set_y_2 = [train_set_y_2[s] for s in sidx[n_train:]]
     valid_set_y_3 = [train_set_y_3[s] for s in sidx[n_train:]]
     train_set_x_1 = [train_set_x_1[s] for s in sidx[:n_train]]
     train_set_x_2 = [train_set_x_2[s] for s in sidx[:n_train]]
-    train_set_x_3 = [train_set_x_3[s] for s in sidx[:n_train]]
+    #train_set_x_3 = [train_set_x_3[s] for s in sidx[:n_train]]
     train_set_y_1 = [train_set_y_1[s] for s in sidx[:n_train]]
     train_set_y_2 = [train_set_y_2[s] for s in sidx[:n_train]]
     train_set_y_3 = [train_set_y_3[s] for s in sidx[:n_train]]
 
-    train_set = (train_set_x_1, train_set_x_2, train_set_x_3, train_set_y_1,train_set_y_2,train_set_y_3)
-    valid_set = (valid_set_x_1, valid_set_x_2, valid_set_x_3, valid_set_y_1,valid_set_y_2,valid_set_y_3)
+    train_set = (train_set_x_1, train_set_x_2, train_set_y_1,train_set_y_2,train_set_y_3)
+    valid_set = (valid_set_x_1, valid_set_x_2, valid_set_y_1,valid_set_y_2,valid_set_y_3)
 
     def remove_unk(x):
         return [[1 if w >= n_words else w for w in sen] for sen in x]
 
-    test_set_x_1, test_set_x_2, test_set_x_3, test_set_y_1,test_set_y_2,test_set_y_3 = test_set
-    valid_set_x_1, valid_set_x_2, valid_set_x_3, valid_set_y_1, valid_set_y_2,valid_set_y_3 = valid_set
-    train_set_x_1, train_set_x_2, train_set_x_3, train_set_y_1, train_set_y_2,train_set_y_3 = train_set
+    test_set_x_1, test_set_x_2, test_set_y_1,test_set_y_2,test_set_y_3 = test_set
+    valid_set_x_1, valid_set_x_2, valid_set_y_1, valid_set_y_2,valid_set_y_3 = valid_set
+    train_set_x_1, train_set_x_2, train_set_y_1, train_set_y_2,train_set_y_3 = train_set
 
     train_set_x_1 = remove_unk(train_set_x_1)
     valid_set_x_1 = remove_unk(valid_set_x_1)
@@ -175,7 +202,7 @@ def load_data(path="nordstrom", n_words=100000, valid_portion=0.1, maxlen=None,
         sorted_index = len_argsort(test_set_x_1)
         test_set_x_1 = [test_set_x_1[i] for i in sorted_index]
         test_set_x_2 = [test_set_x_2[i] for i in sorted_index]
-        test_set_x_3 = [test_set_x_3[i] for i in sorted_index]
+        #test_set_x_3 = [test_set_x_3[i] for i in sorted_index]
         test_set_y_1 = [test_set_y_1[i] for i in sorted_index]
         test_set_y_2 = [test_set_y_2[i] for i in sorted_index]
         test_set_y_3 = [test_set_y_3[i] for i in sorted_index]
@@ -183,7 +210,7 @@ def load_data(path="nordstrom", n_words=100000, valid_portion=0.1, maxlen=None,
         sorted_index = len_argsort(valid_set_x_1)
         valid_set_x_1 = [valid_set_x_1[i] for i in sorted_index]
         valid_set_x_2 = [valid_set_x_2[i] for i in sorted_index]
-        valid_set_x_3 = [valid_set_x_3[i] for i in sorted_index]
+        #valid_set_x_3 = [valid_set_x_3[i] for i in sorted_index]
         valid_set_y_1 = [valid_set_y_1[i] for i in sorted_index]
         valid_set_y_2 = [valid_set_y_2[i] for i in sorted_index]
         valid_set_y_3 = [valid_set_y_3[i] for i in sorted_index]
@@ -191,13 +218,13 @@ def load_data(path="nordstrom", n_words=100000, valid_portion=0.1, maxlen=None,
         sorted_index = len_argsort(train_set_x_1)
         train_set_x_1 = [train_set_x_1[i] for i in sorted_index]
         train_set_x_2 = [train_set_x_2[i] for i in sorted_index]
-        train_set_x_3 = [train_set_x_3[i] for i in sorted_index]
+        #train_set_x_3 = [train_set_x_3[i] for i in sorted_index]
         train_set_y_1 = [train_set_y_1[i] for i in sorted_index]
         train_set_y_2 = [train_set_y_2[i] for i in sorted_index]
         train_set_y_3 = [train_set_y_3[i] for i in sorted_index]
 
-    train = (train_set_x_1, train_set_x_2, train_set_x_3, train_set_y_1,train_set_y_2,train_set_y_3)
-    valid = (valid_set_x_1, valid_set_x_2, valid_set_x_3, valid_set_y_1, valid_set_y_2,valid_set_y_3)
-    test = (test_set_x_1, test_set_x_2, test_set_x_3, test_set_y_1,test_set_y_2,test_set_y_3)
+    train = (train_set_x_1, train_set_x_2, train_set_y_1,train_set_y_2,train_set_y_3)
+    valid = (valid_set_x_1, valid_set_x_2, valid_set_y_1, valid_set_y_2,valid_set_y_3)
+    test = (test_set_x_1, test_set_x_2, test_set_y_1,test_set_y_2,test_set_y_3)
 
     return train, valid, test, dictionary

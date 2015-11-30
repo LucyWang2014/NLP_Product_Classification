@@ -21,6 +21,7 @@ import os
 from subprocess import Popen, PIPE
 
 import pandas as pd
+import pdb
 
 # tokenizer.perl is from Moses: https://github.com/moses-smt/mosesdecoder/tree/master/scripts/tokenizer
 tokenizer_cmd = ['./mosesdecoder/scripts/tokenizer/tokenizer.perl', '-l', 'en', '-q', '-']
@@ -171,8 +172,8 @@ def grab_data(path, dictionary):
     # 'sentences' combines the description with the brand name
     #TODO: why does this often produce bigrams with periods in between?
     # And does this preserve distinction between documents?
-    sentences = list(data.description_clean.astype(str) + 
-        data.brand.astype(str))
+    sentences = list(data.description_clean.astype(str))
+    brands = list(data.brand_num.astype(int))
 
     sentences = tokenize(sentences)
     print "sentence type",type(sentences)
@@ -183,20 +184,24 @@ def grab_data(path, dictionary):
         words = ss.strip().lower().split()
         seqs[idx] = [dictionary[w] if w in dictionary else 1 for w in words]        
 
-    cat_1 = []
-    cat_2 = []
-    for l_1,l_2 in zip(data.cat_1,data.cat_2):
-        cat_1.append(dictionary[str(l_1)]) #TODO: should this be cat_1_dict?
-        cat_2.append(dictionary[str(l_2)])
+    #cat_1 = []
+    #cat_2 = []
+    #for l_1,l_2 in zip(data.cat_1,data.cat_2):
+    #    cat_1.append(dictionary[str(l_1)]) #TODO: should this be cat_1_dict?
+    #    cat_2.append(dictionary[str(l_2)])
 
-    cat_1 = zip(data.cat_1_num,cat_1)
-    cat_2 = zip(data.cat_2_num,cat_2)
+    #cat_1 = zip(data.cat_1_num,cat_1)
+    #cat_2 = zip(data.cat_2_num,cat_2)
 
     label_1 = list(data.cat_1_num)
     label_2 = list(data.cat_2_num)
     label_3 = list(data.cat_3_num)
 
-    return seqs, cat_1, cat_2, label_1, label_2, label_3
+    #cat_1 = one_hot_encode_features(label_1)
+    #cat_2 = one_hot_encode_features(label_2)
+    #brands = one_hot_encode_features(brands)
+
+    return seqs, brands, label_1, label_2, label_3
 
 def main():
     # Get the dataset from http://ai.stanford.edu/~amaas/data/sentiment/
@@ -214,24 +219,25 @@ def main():
 
     dictionary,cat_1_dict, cat_2_dict = build_dict(dataset_path + 'train_set.csv')
 
-    train_x, train_cat_1, train_cat_2, train_y_1, train_y_2, train_y_3 = grab_data(dataset_path+'train_set.csv', dictionary)
+    train_x, brands, train_y_1, train_y_2, train_y_3 = grab_data(dataset_path+'train_set.csv', dictionary)
 
-    test_x, test_cat_1, test_cat_2, test_y_1, test_y_2, test_y_3 = grab_data(dataset_path+'test_set.csv', dictionary)
+    test_x, brands, test_y_1, test_y_2, test_y_3 = grab_data(dataset_path+'test_set.csv', dictionary)
 
-
+    pdb.set_trace()
     #Create directory if not present
-    if not os.path.exists(dataset_path + 'encode_cats'):
-        os.makedirs(dataset_path + 'encode_cats')
+    #if not os.path.exists(dataset_path + 'encode_brands_cats'):
+    #    os.makedirs(dataset_path + 'encode_brands_cats')
+    
 
-    f = open(dataset_path + 'encode_cats/nordstrom_train.pkl', 'wb')
-    pkl.dump((train_x, train_cat_1, train_cat_2, train_y_1, train_y_2, train_y_3), f, -1)
+    f = open(dataset_path + 'encode_brands_cats/nordstrom_train.pkl', 'wb')
+    pkl.dump((train_x, brands, train_y_1, train_y_2, train_y_3), f, -1)
     f.close()
 
-    f = open(dataset_path + 'encode_cats/nordstrom_test.pkl','wb')
-    pkl.dump((test_x, test_cat_1, test_cat_2, test_y_1, test_y_2, test_y_3), f, -1)
+    f = open(dataset_path + 'encode_brands_cats/nordstrom_test.pkl','wb')
+    pkl.dump((test_x, brands, test_y_1, test_y_2, test_y_3), f, -1)
     f.close()
 
-    f = open(dataset_path + 'encode_cats/nordstrom.dict.pkl', 'wb')
+    f = open(dataset_path + 'encode_brands_cats/nordstrom.dict.pkl', 'wb')
     pkl.dump((dictionary,cat_1_dict, cat_2_dict), f, -1)
     f.close()
 

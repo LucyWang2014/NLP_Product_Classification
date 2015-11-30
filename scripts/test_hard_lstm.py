@@ -16,7 +16,7 @@ import nordstrom
 import pdb
 import copy 
 
-datasets = {'nordstrom': (nordstrom.load_data, nordstrom.prepare_data, nordstrom.add_data)}
+datasets = {'nordstrom': (nordstrom.load_data, nordstrom.prepare_data)}
 folder_path = '/Users/Lucy/Google Drive/MSDS/2015Fall/DSGA3001_NLP_Distributed_Representation/Project/'
 
 
@@ -101,7 +101,7 @@ def init_params(options):
                                               params,
                                               prefix=options['encoder'])
     # classifier
-    params['U'] = 0.01 * numpy.random.randn(options['dim_proj'] + options['add_proj'],
+    params['U'] = 0.01 * numpy.random.randn(options['final_proj'],
                                             options['ydim']).astype(config.floatX)
     params['b'] = numpy.zeros((options['ydim'],)).astype(config.floatX)
 
@@ -280,7 +280,7 @@ def gru_layer(tparams, state_below, options, prefix='gru', mask=None):
 layers = {'lstm': (param_init_lstm, lstm_layer),'gru': (param_init_gru,gru_layer)}
 
 
-def sgd(lr, tparams, grads, proj, add_features, y, cost):
+def sgd(lr, tparams, grads, x, mask, y, cost):
     """ Stochastic Gradient Descent
 
     :note: A more complicated version of sgd then needed.  This is
@@ -295,7 +295,7 @@ def sgd(lr, tparams, grads, proj, add_features, y, cost):
 
     # Function that computes gradients for a mini-batch, but do not
     # updates the weights.
-    f_grad_shared = theano.function([proj, add_features, y], cost, updates=gsup,
+    f_grad_shared = theano.function([x, mask, y], cost, updates=gsup,
                                     name='sgd_f_grad_shared')
 
     pup = [(p, p - lr * g) for p, g in zip(tparams.values(), gshared)]
@@ -308,7 +308,7 @@ def sgd(lr, tparams, grads, proj, add_features, y, cost):
     return f_grad_shared, f_update
 
 
-def adadelta(lr, tparams, grads, proj, add_features, y, cost):
+def adadelta(lr, tparams, grads, x, mask, y, cost):
     """
     An adaptive learning rate optimizer
 
@@ -351,7 +351,7 @@ def adadelta(lr, tparams, grads, proj, add_features, y, cost):
     rg2up = [(rg2, 0.95 * rg2 + 0.05 * (g ** 2))
              for rg2, g in zip(running_grads2, grads)]
 
-    f_grad_shared = theano.function([proj, add_features, y], cost, updates=zgup + rg2up,
+    f_grad_shared = theano.function([x, mask, y], cost, updates=zgup + rg2up,
                                     name='adadelta_f_grad_shared')
 
     updir = [-tensor.sqrt(ru2 + 1e-6) / tensor.sqrt(rg2 + 1e-6) * zg
@@ -369,7 +369,7 @@ def adadelta(lr, tparams, grads, proj, add_features, y, cost):
     return f_grad_shared, f_update
 
 
-def rmsprop(lr, tparams, grads, proj, add_features, y, cost):
+def rmsprop(lr, tparams, grads, x, mask, y, cost):
     """
     A variant of  SGD that scales the step size by running average of the
     recent step norms.
@@ -415,7 +415,7 @@ def rmsprop(lr, tparams, grads, proj, add_features, y, cost):
     rg2up = [(rg2, 0.95 * rg2 + 0.05 * (g ** 2))
              for rg2, g in zip(running_grads2, grads)]
 
-    f_grad_shared = theano.function([proj, add_features, y], cost,
+    f_grad_shared = theano.function([x, mask, y], cost,
                                     updates=zgup + rgup + rg2up,
                                     name='rmsprop_f_grad_shared')
 
@@ -441,7 +441,7 @@ def build_model(tparams, options):
     use_noise = theano.shared(numpy_floatX(0.))
 
     x = tensor.matrix('x', dtype='int64')
-    mask = tensor.matrix('mask', dtype = config.floatX)
+    mask = tensor.matrix('mask', dtype=config.floatX)
     y = tensor.vector('y', dtype='int64')
 
     n_timesteps = x.shape[0]
@@ -453,25 +453,17 @@ def build_model(tparams, options):
     proj = get_layer(options['encoder'])[1](tparams, emb, options,
                                             prefix=options['encoder'],
                                             mask=mask)
-
-    #taking the average of all the layers
     if options['encoder'] == 'lstm':
         proj = (proj * mask[:, :, None]).sum(axis=0)
         proj = proj / mask.sum(axis=0)[:, None]
     if options['use_dropout']:
         proj = dropout_layer(proj, use_noise, trng)
 
-    get_proj = theano.function([x.mask],proj)
+    pred = tensor.nnet.softmax(tensor.dot(proj, tparams['U']) + tparams['b'])
 
-    add_features = tensor.matrix('add_features',dtype='int64')
-    final_proj = tensor.concatenate([proj,add_features],axis = 1)
-
-    pred = tensor.nnet.softmax(tensor.dot(final_proj, tparams['U']) + tparams['b'])
-
-    
-    f_pred_prob = theano.function([proj,add_features], pred, name='f_pred_prob')
-    f_pred = theano.function([proj,add_features], pred.argmax(axis=1), name='f_pred')
-    
+    f_pred_prob = theano.function(proj, pred, name='f_pred_prob')
+    f_pred = theano.function(proj, pred.argmax(axis=1), name='f_pred')
+    get_proj = theano.function([x,mask],proj,name='get_proj')
 
     off = 1e-8
     if pred.dtype == 'float16':
@@ -479,10 +471,10 @@ def build_model(tparams, options):
 
     cost = -tensor.log(pred[tensor.arange(n_samples), y] + off).mean()
 
-    return use_noise, x, mask, y, get_proj, f_pred_prob, f_pred, cost
+    return use_noise, x, mask, y, f_pred_prob, f_pred, cost, get_proj
 
 
-def pred_probs(get_proj, f_pred_prob, prepare_data, data, iterator, categories, verbose=False, **kwargs):
+def pred_probs(f_pred_prob, prepare_data, data, iterator, categories, verbose=False):
     """ If you want to use a trained model, this is useful to compute
     the probabilities of new examples.
     """
@@ -492,11 +484,10 @@ def pred_probs(get_proj, f_pred_prob, prepare_data, data, iterator, categories, 
     n_done = 0
 
     for _, valid_index in iterator:
-        x, mask, add_features, y = prepare_data([data[0][t] for t in valid_index],
+        x, mask, y = prepare_data([data[0][t] for t in valid_index],
                                   numpy.array(data[1])[valid_index],
-                                  maxlen=None, **kwargs)
-        proj = get_proj(x, mask)
-        pred_probs = f_pred_prob(proj, add_features)
+                                  maxlen=None)
+        pred_probs = f_pred_prob(x, mask)
 
 
         probs[valid_index,:] = pred_probs
@@ -507,7 +498,7 @@ def pred_probs(get_proj, f_pred_prob, prepare_data, data, iterator, categories, 
 
     return probs
 
-def pred(get_proj, f_pred, prepare_data, iterator, verbose=False, **kwargs):
+def pred(f_pred, prepare_data, data, iterator, verbose=False):
     """
     Just compute the predictions
     f_pred: Theano fct computing the prediction
@@ -519,10 +510,10 @@ def pred(get_proj, f_pred, prepare_data, iterator, verbose=False, **kwargs):
     n_done = 0
 
     for _, valid_index in iterator:
-        x, mask, add_features, y = prepare_data([data[0][t] for t in valid_index],
-                                  numpy.array(data[1])[valid_index], 
-                                  maxlen=None, kwargs)
-        prediction = f_pred(x, mask, add_features)
+        x, mask, y = prepare_data([data[0][t] for t in valid_index],
+                                  numpy.array(data[1])[valid_index],
+                                  maxlen=None)
+        prediction = f_pred(x, mask)
         preds[valid_index] = prediction
 
         n_done += len(valid_index)
@@ -531,7 +522,7 @@ def pred(get_proj, f_pred, prepare_data, iterator, verbose=False, **kwargs):
 
     return preds
 
-def pred_error(get_proj, f_pred, prepare_data, data, iterator, verbose=False, **kwargs):
+def pred_error(f_pred, prepare_data, data, iterator, verbose=False):
     """
     Just compute the error
     f_pred: Theano fct computing the prediction
@@ -539,15 +530,13 @@ def pred_error(get_proj, f_pred, prepare_data, data, iterator, verbose=False, **
     """
     valid_err = 0
     for _, valid_index in iterator:
-        x, mask, add_features, y = prepare_data([data[0][t] for t in valid_index],
+        x, mask, y = prepare_data([data[0][t] for t in valid_index],
                                   numpy.array(data[1])[valid_index],
                                   maxlen=None)
-        preds = f_pred(x, mask, add_features)
+        preds = f_pred(x, mask)
         targets = numpy.array(data[1])[valid_index]
         valid_err += (preds == targets).sum()
-    valid_err = 1. - numpy_flo
-
-    atX(valid_err) / len(data[0])
+    valid_err = 1. - numpy_floatX(valid_err) / len(data[0])
 
     return valid_err
 
@@ -625,35 +614,9 @@ def get_data(
     data = (train, valid, test, dictionary)
     return data
 
-'''
-def get_features(data=None, predictions=None, cat=1):
-
-    train, valid, test, dictionary = data
-    train = copy.deepcopy(train)
-    valid = copy.deepcopy(valid)
-    test = copy.deepcopy(test)
-
-    col = cat + 1
-
-    if cat > 1:
-        train = [train[0],train[1],train[col-1],train[col]]
-        test = [test[0],test[1],predictions,test[col]]
-        valid = [valid[0],valid[1],valid[col-1],valid[col]]
-
-    else:
-        train = [train[0],train[1],train[col]]
-        test = [test[0],test[1],test[col]]
-        valid = [valid[0],valid[1],valid[col]]   
-
-    add_proj = max(train[col-1] + max(train[1]))
-
-    return train, valid, test, add_proj
-'''
-
 def train_lstm(
     data = None,
     dim_proj=128,  # word embeding dimension and LSTM number of hidden units.
-    add_proj = 0, #number of additional features for the final classifier.
     patience=10,  # Number of epoch to wait before early stop if no progress
     max_epochs=5000,  # The maximum number of epoch to run
     dispFreq=10,  # Display to stdout the training progress every N updates
@@ -678,7 +641,6 @@ def train_lstm(
     reload_model=None,  # Path to a saved model we want to start from.
     cat_level = 1, #the level of category to predict
     predictions = None, #the predictions from the previous category run
-    shared_proj = None, #shared lstm features
 ):
 
     # Model options
@@ -687,239 +649,201 @@ def train_lstm(
     print "model options", model_options
 
     load_data, prepare_data = get_dataset(dataset)
+    
+    train, valid, test = data
 
-    train,valid,test = data
-    ydim = numpy.max(train[-1]) + 1
+    ydim = numpy.max(train[1+cat_level]) + 1
 
     model_options['ydim'] = ydim
-
-    def train_model(model_options):
-        print 'Building model'
-        # This create the initial parameters as numpy ndarrays.
-        # Dict name (string) -> numpy ndarray
-        params = init_params(model_options)
-
-        if reload_model:
-            load_params(reload_model, params)
-
-        # This create Theano Shared Variable from the parameters.
-        # Dict name (string) -> Theano Tensor Shared Variable
-        # params and tparams have different copy of the weights.
-        tparams = init_tparams(params)
-
-        # use_noise is for dropout
-        (use_noise, x, mask,
-         y, get_proj, f_pred_prob, f_pred, cost) = build_model(tparams, model_options)
-        proj = get_proj(x,mask)
-
-        if decay_c > 0.:
-            decay_c = theano.shared(numpy_floatX(decay_c), name='decay_c')
-            weight_decay = 0.
-            weight_decay += (tparams['U'] ** 2).sum()
-            weight_decay *= decay_c
-            cost += weight_decay
-
-        f_cost = theano.function([proj,add_features, y], cost, name='f_cost')
-
-        grads = tensor.grad(cost, wrt=tparams.values())
-        f_grad = theano.function([proj, add_features, y], grads, name='f_grad')
-
-        lr = tensor.scalar(name='lr')
-        f_grad_shared, f_update = optimizer(lr, tparams, grads,
-                                            proj, add_features, y, cost)
-
-        print 'Optimization'
-
-        kf_valid = get_minibatches_idx(len(valid[0]), valid_batch_size)
-        kf_test = get_minibatches_idx(len(test[0]), valid_batch_size)
-
-        print "%d train examples" % len(train[0])
-        print "%d valid examples" % len(valid[0])
-        print "%d test examples" % len(test[0])
-
-        history_errs = []
-        best_p = None
-        bad_count = 0
-
-        if validFreq == -1:
-            validFreq = len(train[0]) / batch_size
-        if saveFreq == -1:
-            saveFreq = len(train[0]) / batch_size
-
-        uidx = 0  # the number of update done
-        estop = False  # early stop
-        start_time = time.time()
-        try:
-            for eidx in xrange(max_epochs):
-                if shared_proj = None:
-                    train_proj = numpy.zeros((len(train[0]), dim_proj)).astype(config.floatX)
-                    valid_proj = numpy.zeros((len(valid[0]), dim_proj)).astype(config.floatX)
-                    test_proj = numpy.zeros((len(valid[0]), dim_proj)).astype(config.floatX)
-
-                n_samples = 0
-
-                # Get new shuffled index for the training set.
-                kf = get_minibatches_idx(len(train[0]), batch_size, shuffle=True)
-
-                for _, train_index in kf:
-                    uidx += 1
-                    use_noise.set_value(1.)
-
-                    # Select the random examples for this minibatch
-                    x = [train[0][t]for t in train_index]
-                    brands = [train[1][t]for t in train_index]
-                    
-                    if cat_level = 1:
-                        prev_cat = None
-                        y = [train[2][t] for t in train_index]
-                    elif cat_level = 2:
-                        prev_cat = [train[2][t] for t in train_index]
-                        y = [train[3][t] for t in train_index]
-                    else:
-                        prev_cat = [train[3][t] for t in train_index]
-                        y = [train[4][t] for t in train_index]
-
-                    # Get the data in numpy.ndarray format
-                    # This swap the axis!
-                    # Return something of shape (minibatch maxlen, n samples)
-                    x, mask, add_features, y = prepare_data(x, y, brands = brands, prev_cat = prev_cat)
-                    n_samples += x.shape[1]
-
-                    proj = get_proj(x,mask)
-                    cost = f_grad_shared(proj add_features, y)
-                    f_update(lrate)
-
-                    if numpy.isnan(cost) or numpy.isinf(cost):
-                        print 'NaN detected'
-                        return 1., 1., 1.
-
-                    if numpy.mod(uidx, dispFreq) == 0:
-                        print 'Epoch ', eidx, 'Update ', uidx, 'Cost ', cost
-
-                    if saveto and numpy.mod(uidx, saveFreq) == 0:
-                        print 'Saving...',
-
-                        if best_p is not None:
-                            params = best_p
-                        else:
-                            params = unzip(tparams)
-                        numpy.savez(saveto, history_errs=history_errs, **params)
-                        pkl.dump(model_options, open('%s.pkl' % saveto, 'wb'), -1)
-                        print 'Done'
-
-                    if numpy.mod(uidx, validFreq) == 0:
-                        use_noise.set_value(0.)
-                        train_err = pred_error(get_proj, f_pred, prepare_data, train, kf)
-                        valid_err = pred_error(get_proj, f_pred, prepare_data, valid,
-                                               kf_valid)
-                        test_err = pred_error(get_proj, f_pred, prepare_data, test, kf_test)
-
-                        history_errs.append([valid_err, test_err])
-
-                        if (uidx == 0 or
-                            valid_err <= numpy.array(history_errs)[:,
-                                                                   0].min()):
-
-                            best_p = unzip(tparams)
-                            bad_counter = 0
-
-                        print ('Train ', train_err, 'Valid ', valid_err,
-                               'Test ', test_err)
-
-                        if (len(history_errs) > patience and
-                            valid_err >= numpy.array(history_errs)[:-patience,
-                                                                   0].min()):
-                            bad_counter += 1
-                            if bad_counter > patience:
-                                print 'Early Stop!'
-                                estop = True
-                                break
-
-                print 'Seen %d samples' % n_samples
-
-                if estop:
-                    break
-
-        except KeyboardInterrupt:
-            print "Training interupted"
-
-        end_time = time.time()
-        if best_p is not None:
-            zipp(best_p, tparams)
-        else:
-            best_p = unzip(tparams)
-
-        use_noise.set_value(0.)
-        kf_train_sorted = get_minibatches_idx(len(train[0]), batch_size)
-        train_err = pred_error(get_proj, f_pred, prepare_data, train, kf_train_sorted)
-        valid_err = pred_error(get_proj, f_pred, prepare_data, valid, kf_valid)
-        test_err = pred_error(get_proj, f_pred, prepare_data, test, kf_test)
-
-        predictions = pred(get_proj, f_pred, prepare_data, test, kf_test)
-        prediction_probs = pred_probs(get_proj, f_pred_prob, prepare_data,test, kf_test, ydim)
-
-        print 'Train ', train_err, 'Valid ', valid_err, 'Test ', test_err
-        if saveto:
-            numpy.savez(saveto, train_err=train_err,
-                        valid_err=valid_err, test_err=test_err,
-                        history_errs=history_errs, **best_p)
-        print 'The code run for %d epochs, with %f sec/epochs' % (
-            (eidx + 1), (end_time - start_time) / (1. * (eidx + 1)))
-        print >> sys.stderr, ('Training took %.1fs' %
-                              (end_time - start_time))
-        return history_errs, predictions, prediction_probs, proj
-
-    brand_dim = max(train[1])
-    cat_1_dim = max(train[2])
-    cat_2_dim = max(train[3])
-
-
-    #train level_1
     model_options['data'] = data
-    cat_level = 1 
-    predictions = None
-    shared_proj = None
 
-    history_errs, predictions_1, prediction_probs_1 = train_model(model_options)
+    print 'Building model'
+    # This create the initial parameters as numpy ndarrays.
+    # Dict name (string) -> numpy ndarray
+    params_1 = init_params(model_options)
 
+    if reload_model:
+        load_params(reload_model, params)
 
+    # This create Theano Shared Variable from the parameters.
+    # Dict name (string) -> Theano Tensor Shared Variable
+    # params and tparams have different copy of the weights.
+    tparams = init_tparams(params)
 
-    
+    # use_noise is for dropout
+    (use_noise, x, mask,
+     y, f_pred_prob, f_pred, cost, get_proj) = build_model(tparams, model_options)
 
-    #make final predictions
-    predictions = numpy.vstack((predictions_1, predictions_2,predictions_3))
-    prediction_probs = numpy.vstack((prediction_probs_1, prediction_probs_2,prediction_probs_3))
-    all_err, two_cat_err, one_cat_err = final_errors(predictions, target, verbose=False)
+    if decay_c > 0.:
+        decay_c = theano.shared(numpy_floatX(decay_c), name='decay_c')
+        weight_decay = 0.
+        weight_decay += (tparams['U'] ** 2).sum()
+        weight_decay *= decay_c
+        cost += weight_decay
 
-    return all_err, two_cat_err, one_cat_err, predictions, prediction_probs
+    f_cost = theano.function([x, mask, y], cost, name='f_cost')
+
+    grads = tensor.grad(cost, wrt=tparams.values())
+    f_grad = theano.function([x, mask, y], grads, name='f_grad')
+
+    lr = tensor.scalar(name='lr')
+    f_grad_shared, f_update = optimizer(lr, tparams, grads,
+                                        x, mask, y, cost)
+
+    print 'Optimization'
+
+    kf_valid = get_minibatches_idx(len(valid[0]), valid_batch_size)
+    kf_test = get_minibatches_idx(len(test[0]), valid_batch_size)
+
+    print "%d train examples" % len(train[0])
+    print "%d valid examples" % len(valid[0])
+    print "%d test examples" % len(test[0])
+
+    history_errs = []
+    best_p = None
+    bad_count = 0
+
+    if validFreq == -1:
+        validFreq = len(train[0]) / batch_size
+    if saveFreq == -1:
+        saveFreq = len(train[0]) / batch_size
+
+    uidx = 0  # the number of update done
+    estop = False  # early stop
+    start_time = time.time()
+    try:
+        for eidx in xrange(max_epochs):
+            n_samples = 0
+
+            # Get new shuffled index for the training set.
+            kf = get_minibatches_idx(len(train[0]), batch_size, shuffle=True)
+
+            for _, train_index in kf:
+                uidx += 1
+                use_noise.set_value(1.)
+
+                # Select the random examples for this minibatch
+                y = [train[1][t] for t in train_index]
+                x = [train[0][t]for t in train_index]
+
+                # Get the data in numpy.ndarray format
+                # This swap the axis!
+                # Return something of shape (minibatch maxlen, n samples)
+                x, mask, y = prepare_data(x, y)
+                n_samples += x.shape[1]
+
+                pdb.set_trace()
+                proj = get_proj(x,mask)
+                cost = f_grad_shared(x, mask, y)
+                f_update(lrate)
+
+                if numpy.isnan(cost) or numpy.isinf(cost):
+                    print 'NaN detected'
+                    return 1., 1., 1.
+
+                if numpy.mod(uidx, dispFreq) == 0:
+                    print 'Epoch ', eidx, 'Update ', uidx, 'Cost ', cost
+
+                if saveto and numpy.mod(uidx, saveFreq) == 0:
+                    print 'Saving...',
+
+                    if best_p is not None:
+                        params = best_p
+                    else:
+                        params = unzip(tparams)
+                    numpy.savez(saveto, history_errs=history_errs, **params)
+                    pkl.dump(model_options, open('%s.pkl' % saveto, 'wb'), -1)
+                    print 'Done'
+
+                if numpy.mod(uidx, validFreq) == 0:
+                    use_noise.set_value(0.)
+                    train_err = pred_error(f_pred, prepare_data, train, kf)
+                    valid_err = pred_error(f_pred, prepare_data, valid,
+                                           kf_valid)
+                    test_err = pred_error(f_pred, prepare_data, test, kf_test)
+
+                    history_errs.append([valid_err, test_err])
+
+                    if (uidx == 0 or
+                        valid_err <= numpy.array(history_errs)[:,
+                                                               0].min()):
+
+                        best_p = unzip(tparams)
+                        bad_counter = 0
+
+                    print ('Train ', train_err, 'Valid ', valid_err,
+                           'Test ', test_err)
+
+                    if (len(history_errs) > patience and
+                        valid_err >= numpy.array(history_errs)[:-patience,
+                                                               0].min()):
+                        bad_counter += 1
+                        if bad_counter > patience:
+                            print 'Early Stop!'
+                            estop = True
+                            break
+
+            print 'Seen %d samples' % n_samples
+
+            if estop:
+                break
+
+    except KeyboardInterrupt:
+        print "Training interupted"
+
+    end_time = time.time()
+    if best_p is not None:
+        zipp(best_p, tparams)
+    else:
+        best_p = unzip(tparams)
+
+    use_noise.set_value(0.)
+    kf_train_sorted = get_minibatches_idx(len(train[0]), batch_size)
+    train_err = pred_error(f_pred, prepare_data, train, kf_train_sorted)
+    valid_err = pred_error(f_pred, prepare_data, valid, kf_valid)
+    test_err = pred_error(f_pred, prepare_data, test, kf_test)
+
+    predictions = pred(f_pred, prepare_data, test, kf_test)
+    prediction_probs = pred_probs(f_pred_prob, prepare_data,test, kf_test, ydim)
+
+    print 'Train ', train_err, 'Valid ', valid_err, 'Test ', test_err
+    if saveto:
+        numpy.savez(saveto, train_err=train_err,
+                    valid_err=valid_err, test_err=test_err,
+                    history_errs=history_errs, **best_p)
+    print 'The code run for %d epochs, with %f sec/epochs' % (
+        (eidx + 1), (end_time - start_time) / (1. * (eidx + 1)))
+    print >> sys.stderr, ('Training took %.1fs' %
+                          (end_time - start_time))
+    return train_err, valid_err, test_err, history_errs, predictions, prediction_probs
+
 def main():
 
-    data = get_data(test_size=100,
-        train_size = 1000,
+    data = get_data(test_size=10, 
+        train_size = 100,
         dataset='nordstrom',
-        path = 'data/encode_brands_cats/')
+        path = 'data/encode_cats/')
 
     save_path = '/Users/Lucy/Google Drive/MSDS/2015Fall/DSGA3001_NLP_Distributed_Representation/Project/results/'
     save_folder = 'hard_pred_shared_lstm/'
     
-    train, valid, test, dictionary= data
+    train, valid, test, dictionary = data
 
-    #data_1 = get_features(data = data)
+    data_1 = get_features(data = data)
 
     max_epochs = 100
 
-    train_err,valid_err, test_err, history_errs, predictions_1, predictions_2, predictions_3 = train_lstm(
-        data = data,
+    train_err_1,valid_err_1, test_err_1, history_errs, predictions_1, prediction_probs_1 = train_lstm(
+        data = data_1,
         dim_proj=256,
         max_epochs=max_epochs,
         cat_level = 1,
         dataset='nordstrom',
-        path = 'data/encode_brands_cats/',
+        path = 'data/encode_cats/',
         saveto=save_path + save_folder + 'nordstrom_model_cat_1.npz',
         reload_model=None
     )
 
-    '''
     data_2 = get_features(data=data, predictions=predictions_1, cat=2)
 
     train_err_2,valid_err_2, test_err_2, history_errs, predictions_2, prediction_probs_2 = train_lstm(
@@ -927,7 +851,7 @@ def main():
         max_epochs=max_epochs,
         cat_level = 2,
         dataset='nordstrom',
-        path = 'data/encode_brands_cats/',
+        path = 'data/encode_cats/',
         saveto=save_path + save_folder + 'nordstrom_model_cat_2.npz',
         reload_model=None
     )
@@ -939,19 +863,21 @@ def main():
         max_epochs=max_epochs,
         cat_level = 3,
         dataset='nordstrom',
-        path = 'data/encode_brands_cats/',
+        path = 'data/encode_cats/',
         saveto=save_path + save_folder + 'nordstrom_model_cat_3.npz',
         reload_model=None
     )
-    
-    '''
 
-    #target = numpy.vstack((test[3],test[4],test[5]))
+    predictions = numpy.vstack((predictions_1, predictions_2,predictions_3))
+    prediction_probs = numpy.vstack((prediction_probs_1, prediction_probs_2,prediction_probs_3))
+    
+    target = numpy.vstack((test[3],test[4],test[5]))
 
     numpy.savez(save_path + save_folder + 'nordstrom_model_lstm_encode.npz', predictions = predictions, prediction_probs = prediction_probs,
     target = target)
 
-    
+    all_err, two_cat_err, one_cat_err = final_errors(predictions, target, verbose=False)
+
     print 'all_errors: %s | two_cat_errors : %s | one_cat_errors: %s' %(all_err, two_cat_err, one_cat_err)
 
     #numpy.savez(saveto, train_err_1=train_err_1,

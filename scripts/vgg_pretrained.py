@@ -14,7 +14,7 @@
 
 # In[ ]:
 
-get_ipython().system(u'wget https://s3.amazonaws.com/lasagne/recipes/pretrained/imagenet/vgg_cnn_s.pkl')
+#get_ipython().system(u'wget https://s3.amazonaws.com/lasagne/recipes/pretrained/imagenet/vgg_cnn_s.pkl')
 
 
 # # Setup
@@ -22,10 +22,15 @@ get_ipython().system(u'wget https://s3.amazonaws.com/lasagne/recipes/pretrained/
 # In[1]:
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import pdb
+import theano
+from PIL import Image
+import urllib, cStringIO
 
-get_ipython().magic(u'matplotlib inline')
-
+print "Theano device:",theano.config.device
 
 # In[4]:
 
@@ -67,7 +72,7 @@ output_layer = net['fc8']
 
 import pickle
 
-model = pickle.load(open('vgg_cnn_s.pkl'))
+model = pickle.load(open('/scratch/cdg356/spring/data/vgg_cnn_s.pkl'))
 CLASSES = model['synset words']
 MEAN_IMAGE = model['mean image']
 
@@ -98,6 +103,34 @@ image_urls = image_urls[:5]
 import io
 import skimage.transform
 
+def prep_image_PIL(url):
+    #NOTE: only takes JPG I think
+    img_file = cStringIO.StringIO(urllib.urlopen(url).read())
+    im = Image.open(img_file)
+    # Resize so smallest dim = 256, preserving aspect ratio
+    height, w = im.size
+    if height < w:
+        im = im.thumbnail((256, w*256/height), Image.ANTIALIAS)
+        #im = skimage.transform.resize(im, (256, w*256/height), preserve_range=True)
+    else:
+        im = im.thumbnail((height*256/w, 256), Image.ANTIALIAS)
+        #im = skimage.transform.resize(im, (height*256/w, 256), preserve_range=True)    
+
+    # Central crop to 224x224
+    height, w, _ = im.shape
+    im = im[height//2-112:height//2+112, w//2-112:w//2+112]
+    
+    rawim = np.copy(im).astype('uint8')
+    
+    # Shuffle axes to c01
+    im = np.swapaxes(np.swapaxes(im, 1, 2), 0, 1)
+    
+    # Convert to BGR
+    im = im[::-1, :, :]
+
+    im = im - MEAN_IMAGE
+    return rawim, floatX(im[np.newaxis])
+
 def prep_image(url):
     ext = url.split('.')[-1]
     im = plt.imread(io.BytesIO(urllib.urlopen(url).read()), ext)
@@ -123,11 +156,10 @@ def prep_image(url):
     im = im - MEAN_IMAGE
     return rawim, floatX(im[np.newaxis])
 
-
 # ### Process test images and print top 5 predicted labels
 
 # In[8]:
-
+#pdb.set_trace()
 for url in image_urls:
     try:
         rawim, im = prep_image(url)
@@ -139,7 +171,8 @@ for url in image_urls:
         plt.imshow(rawim.astype('uint8'))
         plt.axis('off')
         for n, label in enumerate(top5):
-            plt.text(250, 70 + n * 20, '{}. {}'.format(n+1, CLASSES[label]), fontsize=14)
+            plt.text(250, 70 + n * 20, '{}. {}'.format(n+2, CLASSES[label]), fontsize=14)
+        plt.savefig('/home/cdg356/spring/'+url[-10:])
     except IOError:
         print('bad url: ' + url)
 

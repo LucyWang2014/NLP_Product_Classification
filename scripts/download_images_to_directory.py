@@ -1,5 +1,5 @@
 '''
-download_images.py
+download_images_to_directory.py
 '''
 __author__="Charlie Guthrie"
 
@@ -14,10 +14,44 @@ import numpy as np
 from PIL import Image
 import urllib, cStringIO
 
-def download_and_resize(url,idx,dataset,datadir,width=64,filetype='bmp'):
+import io
+import skimage.transform
+
+def download_and_resize(url):
+    '''
+    '''
+    ext = url.split('.')[-1]
+    im = plt.imread(io.BytesIO(urllib.urlopen(url).read()), ext)
+    # Resize so smallest dim = 256, preserving aspect ratio
+    h, w, _ = im.shape
+    if h < w:
+        im = skimage.transform.resize(im, (256, w*256/h), preserve_range=True)
+    else:
+        im = skimage.transform.resize(im, (h*256/w, 256), preserve_range=True)
+
+    # Central crop to 224x224
+    h, w, _ = im.shape
+    im = im[h//2-112:h//2+112, w//2-112:w//2+112]
+    
+    #rawim = np.copy(im).astype('uint8')
+    rawim = np.astype('uint8')
+    return rawim
+ 
+def process_for_rnn(im):
+    # Shuffle axes to c01
+    im = np.swapaxes(np.swapaxes(im, 1, 2), 0, 1)
+    
+    # Convert to BGR
+    im = im[::-1, :, :]
+
+    im = im - MEAN_IMAGE
+    return floatX(im[np.newaxis])
+
+def prep_image(url,idx,dataset,datadir,width,filetype='bmp'):
     '''
     Check to see image file has been downloaded at current size.  If it has not,
-    download and resize image. Saves file to datadir/images/imx[idx].bmp
+    download and resize image. Saves file to datadir/images/[dataset]_[idx]_w[width].[filetype]
+    e.g. datadir/images/train_10001_w256.bmp
     
     args:
         url: url of image source
@@ -26,21 +60,20 @@ def download_and_resize(url,idx,dataset,datadir,width=64,filetype='bmp'):
         datadir: data directory
         width: desired width of image. Will be resized to width squared
     returns:
-        none
+        rawim: scaled and cropped image
+        im: processed image to input into VGG
     '''
-    outpath = datadir + 'images/' + dataset + str(idx) + '_w' + str(width) + '.' + filetype
+    outpath = datadir + 'images/' + dataset + '_' +  str(idx) + '_w' + str(width) + '.' + filetype
     
     if not os.path.isfile(outpath):
-        print "getting image #%s..." %str(idx)
-        #try:
-        img_file = cStringIO.StringIO(urllib.urlopen(url).read())
-        img = Image.open(img_file)
-        resized = img.thumbnail((width,width), Image.ANTIALIAS)
-        img.save(outpath)
-       # except:
-        #    print "unable to download"
+        print "downloading image #%s..." %str(idx)
+        try:
+            rawim,im = prep_image(url)
+        except:
+            print "unable to download"
     else:
-        print "image # %s already downloaded" %str(idx)
+        print "loading image %i from file..." % idx
+        
 
 def get_selected_images(csv_path,first_idx,last_idx,dataset,datadir,width=64,filetype='bmp'):
     '''

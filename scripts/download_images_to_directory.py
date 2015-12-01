@@ -96,10 +96,10 @@ def main(csv_name,dataset,first_idx,last_idx):
 
     home = os.path.join(os.path.dirname(__file__),'..')
     #local datadir
-    datadir = os.path.join(home,'data') + '/'
+    #datadir = os.path.join(home,'data') + '/'
 
     #hpc datadir
-    #datadir = '/scratch/cdg356/spring/data/'
+    datadir = '/scratch/cdg356/spring/data/'
     
     csv_path = datadir + csv_name
 

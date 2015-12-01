@@ -6,6 +6,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pdb
 import theano
+import cPickle as pkl
+import download_images_to_directory as dl
 
 print "Theano device:",theano.config.device
 
@@ -22,6 +24,7 @@ from lasagne.utils import floatX
 
 # In[ ]:
 
+print "Building lasagne net..."
 net = {}
 net['input'] = InputLayer((None, 3, 224, 224))
 net['conv1'] = ConvLayer(net['input'], num_filters=96, filter_size=7, stride=2)
@@ -39,15 +42,16 @@ net['fc7'] = DenseLayer(net['drop6'], num_units=4096)
 net['drop7'] = DropoutLayer(net['fc7'], p=0.5)
 net['fc8'] = DenseLayer(net['drop7'], num_units=1000, nonlinearity=lasagne.nonlinearities.softmax)
 output_layer = net['fc8']
-
+last_layer = net['fc7']
 
 # ### Load the model parameters and metadata
 datadir = "/scratch/cdg356/spring/data/"
+
+print "Loading vgg model..."
 model = pkl.load(open(datadir+'vgg_cnn_s.pkl'))
 CLASSES = model['synset words']
 MEAN_IMAGE = model['mean image']
 
-print model['values'][:10]
 lasagne.layers.set_all_param_values(output_layer, model['values'])
 
 def get_output(im):
@@ -61,9 +65,9 @@ def get_output(im):
     
     im=floatX(im[np.newaxis])
     
-    prob = np.array(lasagne.layers.get_output(output_layer, im, deterministic=True).eval())
-    top5 = np.argsort(prob[0])[-1:-6:-1]
-    return top5
+    ll = np.array(lasagne.layers.get_output(last_layer, im, deterministic=True).eval())
+    #top5 = np.argsort(prob[0])[-1:-6:-1]
+    return im,ll
 
 url="http://content.nordstrom.com/imagegallery/store/product/large/9/_8947109.jpg"
 i=0
@@ -71,9 +75,8 @@ dataset="train"
 width=224
 filetype="jpg"
 
-im = prep_image(url,i,dataset,datadir,width,filetype)
-top5 = get_output(im)
-print top5
-
+rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
+im,ll = get_output(rawim)
+print ll
 pdb.set_trace()
 

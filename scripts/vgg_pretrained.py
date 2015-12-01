@@ -1,25 +1,4 @@
-
 # coding: utf-8
-
-# # Introduction
-# 
-# This example demonstrates using a network pretrained on ImageNet for classification. The model used was converted from the VGG_CNN_S model (http://arxiv.org/abs/1405.3531) in [Caffe's Model Zoo](https://github.com/BVLC/caffe/wiki/Model-Zoo). 
-# 
-# For details of the conversion process, see the example notebook "Using a Caffe Pretrained Network - CIFAR10".
-
-# ### License
-# The model is licensed for non-commercial use only
-
-# ### Download the model (393 MB)
-
-# In[ ]:
-
-#get_ipython().system(u'wget https://s3.amazonaws.com/lasagne/recipes/pretrained/imagenet/vgg_cnn_s.pkl')
-
-
-# # Setup
-
-# In[1]:
 
 import numpy as np
 import matplotlib
@@ -27,12 +6,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pdb
 import theano
-from PIL import Image
-import urllib, cStringIO
 
 print "Theano device:",theano.config.device
-
-# In[4]:
 
 #dnn requires GPU
 import lasagne
@@ -67,112 +42,38 @@ output_layer = net['fc8']
 
 
 # ### Load the model parameters and metadata
-
-# In[5]:
-
-import pickle
-
-model = pickle.load(open('/scratch/cdg356/spring/data/vgg_cnn_s.pkl'))
+datadir = "/scratch/cdg356/spring/data/"
+model = pkl.load(open(datadir+'vgg_cnn_s.pkl'))
 CLASSES = model['synset words']
 MEAN_IMAGE = model['mean image']
 
+print model['values'][:10]
 lasagne.layers.set_all_param_values(output_layer, model['values'])
 
-
-# # Trying it out
-# 
-# ### Get some test images
-# We'll download the ILSVRC2012 validation URLs and pick a few at random
-
-# In[6]:
-
-import urllib
-
-index = urllib.urlopen('http://www.image-net.org/challenges/LSVRC/2012/ori_urls/indexval.html').read()
-image_urls = index.split('<br>')
-
-np.random.seed(23)
-np.random.shuffle(image_urls)
-image_urls = image_urls[:5]
-
-
-# ### Helper to fetch and preprocess images
-
-# In[7]:
-
-import io
-import skimage.transform
-
-def prep_image_PIL(url):
-    #NOTE: only takes JPG I think
-    img_file = cStringIO.StringIO(urllib.urlopen(url).read())
-    im = Image.open(img_file)
-    # Resize so smallest dim = 256, preserving aspect ratio
-    height, w = im.size
-    if height < w:
-        im = im.thumbnail((256, w*256/height), Image.ANTIALIAS)
-        #im = skimage.transform.resize(im, (256, w*256/height), preserve_range=True)
-    else:
-        im = im.thumbnail((height*256/w, 256), Image.ANTIALIAS)
-        #im = skimage.transform.resize(im, (height*256/w, 256), preserve_range=True)    
-
-    # Central crop to 224x224
-    height, w, _ = im.shape
-    im = im[height//2-112:height//2+112, w//2-112:w//2+112]
-    
-    rawim = np.copy(im).astype('uint8')
-    
+def get_output(im):
     # Shuffle axes to c01
     im = np.swapaxes(np.swapaxes(im, 1, 2), 0, 1)
-    
+
     # Convert to BGR
     im = im[::-1, :, :]
 
     im = im - MEAN_IMAGE
-    return rawim, floatX(im[np.newaxis])
-
-def prep_image(url):
-    ext = url.split('.')[-1]
-    im = plt.imread(io.BytesIO(urllib.urlopen(url).read()), ext)
-    # Resize so smallest dim = 256, preserving aspect ratio
-    h, w, _ = im.shape
-    if h < w:
-        im = skimage.transform.resize(im, (256, w*256/h), preserve_range=True)
-    else:
-        im = skimage.transform.resize(im, (h*256/w, 256), preserve_range=True)
-
-    # Central crop to 224x224
-    h, w, _ = im.shape
-    im = im[h//2-112:h//2+112, w//2-112:w//2+112]
     
-    rawim = np.copy(im).astype('uint8')
+    im=floatX(im[np.newaxis])
     
-    # Shuffle axes to c01
-    im = np.swapaxes(np.swapaxes(im, 1, 2), 0, 1)
-    
-    # Convert to BGR
-    im = im[::-1, :, :]
+    prob = np.array(lasagne.layers.get_output(output_layer, im, deterministic=True).eval())
+    top5 = np.argsort(prob[0])[-1:-6:-1]
+    return top5
 
-    im = im - MEAN_IMAGE
-    return rawim, floatX(im[np.newaxis])
+url="http://content.nordstrom.com/imagegallery/store/product/large/9/_8947109.jpg"
+i=0
+dataset="train"
+width=224
+filetype="jpg"
 
-# ### Process test images and print top 5 predicted labels
+im = prep_image(url,i,dataset,datadir,width,filetype)
+top5 = get_output(im)
+print top5
 
-# In[8]:
-#pdb.set_trace()
-for url in image_urls:
-    try:
-        rawim, im = prep_image(url)
-
-        prob = np.array(lasagne.layers.get_output(output_layer, im, deterministic=True).eval())
-        top5 = np.argsort(prob[0])[-1:-6:-1]
-
-        plt.figure()
-        plt.imshow(rawim.astype('uint8'))
-        plt.axis('off')
-        for n, label in enumerate(top5):
-            plt.text(250, 70 + n * 20, '{}. {}'.format(n+2, CLASSES[label]), fontsize=14)
-        plt.savefig('/home/cdg356/spring/'+url[-10:])
-    except IOError:
-        print('bad url: ' + url)
+pdb.set_trace()
 

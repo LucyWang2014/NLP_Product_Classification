@@ -1,13 +1,6 @@
 """
-Usage example employing Lasagne for digit recognition using the MNIST dataset.
+Adapted from the MNIST example codes in Lasagne
 
-This example is deliberately structured as a long flat file, focusing on how
-to use Lasagne, instead of focusing on writing maximally modular and reusable
-code. It is used as the foundation for the introductory Lasagne tutorial:
-http://lasagne.readthedocs.org/en/latest/user/tutorial.html
-
-More in-depth examples and reproductions of paper results are maintained in
-a separate repository: https://github.com/Lasagne/Recipes
 """
 
 from __future__ import print_function
@@ -17,6 +10,7 @@ import os
 import time
 import cPickle
 import time
+import collections
 
 import numpy as np
 import theano
@@ -29,9 +23,7 @@ from mlp_functions import one_hot_encode_features
 import pdb
 
 
-# ################## Download and prepare the MNIST dataset ##################
-# This is just some way of getting the MNIST dataset from an online location
-# and loading it into numpy arrays. It doesn't involve Lasagne at all.
+# ################## load the data ##################
 
 def get_data(
     path = '../data/mlp_data/', #This is the path for the dictionaries to use
@@ -50,9 +42,10 @@ def get_data(
     f_train.close()
     f_test.close()
 
+    #set the number of uniques for each variable
     keys = ['desc','brands','y_1','y_2','y_3']
-    values = [5000,max(train_set[1]),max(train_set[2]),max(train_set[3]), max(train_set[4])]
-    n_values = dict(zip(keys,values))
+    values = [desc_n_values,max(train_set[1])+1,max(train_set[2])+1,max(train_set[3])+1, max(train_set[4])+1]
+    n_values = collections.OrderedDict(zip(keys,values))
 
     # split training set into validation set
     train_desc, train_brands, train_y_1, train_y_2, train_y_3 = train_set
@@ -181,6 +174,26 @@ def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=.2,
     network = lasagne.layers.DenseLayer(network, num_units, nonlinearity=softmax)
     return network
 
+def classifier_layer(network, prev_cat, num_units, layer_shape = None):
+    #This takes in a pretrained network and concatenates it with additional
+    #features. Then the combined layer is fed into the output layer
+
+    #Output layer
+    softmax = lasagne.nonlinearities.softmax
+
+    #get all layers from the pretrained network and gets the last layer before the output layer
+    layers = lasagne.layers.get_all_layers(network)
+    output = lasagne.layers.get_output(layers[-2])
+
+    #concatenate the output with additional layers
+    network = T.concatenate([output, prev_cat], axis = 1)
+
+    #use combined layer as input layer for new network and feed into output layer
+    network = lasagne.layers.InputLayer(shape=(None, layer_shape),input_var=network)
+    network = lasagne.layers.DenseLayer(network, num_units, nonlinearity=softmax)
+
+    return network
+
 # ############################# Batch iterator ###############################
 # This is just a simple helper function iterating over training data in
 # mini-batches of a particular size, optionally in random order. It assumes
@@ -211,7 +224,9 @@ def iterate_minibatches(inputs, target, batchsize, shuffle=False):
 # more functions to better separate the code, but it wouldn't make it any
 # easier to read.
 
-def main(model='custom_mlp: ', 
+def train_model(model='custom_mlp: ', 
+    data = None,
+    n_values = None,
     num_epochs=5,
     desc_n_values = 5000,
     depth = 10,
@@ -222,35 +237,48 @@ def main(model='custom_mlp: ',
     learning_rate = 0.01,
     valid_freq = 100,
     save_path = '../results/',
-    saveto = 'test_mlp.npz'):
-
-
-    # Load the dataset
-    print("Loading data...")
-    data, n_values = get_data(
-        test_size=100,  # If >0, we keep only this number of test example.
-        train_size = 2500, # If >0, we keep only this number of train example.
-        valid_portion = 0.1,
-        desc_n_values = desc_n_values)
+    saveto = 'test_mlp.npz',
+    reload_model = None,
+    shared_params = None,
+    cat = 1,
+    prev_predictions = None):
 
     train, valid, test = data
 
-    layer_shape = desc_n_values + n_values['brands'] + 2
+    layer_shape = desc_n_values + n_values['brands']
 
     # Prepare Theano variables for inputs and target
     input_var = T.matrix('inputs',dtype='int64')
     target_var = T.ivector('target')
+
+    n_val_keys = n_values.keys()
+    if cat != 1:
+        prev_cat_var = T.matrix('prev_inputs',dtype='int64')
+        classifier_layer_shape = width + n_values[n_val_keys[cat]]
+        train_prev_cat = train[cat]
+        valid_prev_cat = valid[cat]
+        test_prev_cat = prev_predictions
 
     # Create neural network model (depending on first command line parameter)
     start_time = time.time()
     print("Building model and compiling functions...")
     if model == 'mlp':
         network = build_mlp(input_var, layer_shape, n_values['y_1']+1)
-    elif model.startswith('custom_mlp'):
+    elif model == 'custom_mlp':
         #depth, width, drop_in, drop_hid = model.split(':', 1)[1].split(',')
         #network = build_custom_mlp(input_var, int(depth), int(width),
         #                          float(drop_in), float(drop_hid))
-        network = build_custom_mlp(input_var, depth, width, drop_in, drop_hid, layer_shape, n_values['y_1']+1)
+        network = build_custom_mlp(input_var, depth, width, drop_in, drop_hid, layer_shape, n_values['y_1'])
+    elif model == 'classifier_layer':
+        network = build_custom_mlp(input_var, depth, width, drop_in, drop_hid, layer_shape, n_values['y_1'])
+        if reload_model is not None:
+            with np.load(reload_model) as f:
+                param_values = [f['arr_%d' % i] for i in range(len(f.files)-7)]
+            lasagne.layers.set_all_param_values(network, param_values)
+        if shared_params is not None:
+            lasagne.layers.set_all_param_values(network, shared_params)
+        network = classifier_layer(network, 
+            prev_cat_var, n_values[n_val_keys[cat + 1]], layer_shape = classifier_layer_shape)
     else:
         print("Unrecognized model type %r." % model)
         return
@@ -282,10 +310,15 @@ def main(model='custom_mlp: ',
 
     # Compile a function performing a training step on a mini-batch (by giving
     # the updates dictionary) and returning the corresponding training loss:
-    train_fn = theano.function([input_var, target_var], loss, updates=updates)
-
-    # Compile a second function computing the validation loss and accuracy:
-    val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
+    if cat != 1:
+        train_fn = theano.function([input_var, prev_cat_var, target_var], loss, updates=updates)
+        # Compile a second function computing the validation loss and accuracy:
+        val_fn = theano.function([input_var, prev_cat_var, target_var], [test_loss, test_acc])
+        preds = theano.function([input_var, prev_cat_var],test_prediction)
+    else:
+        train_fn = theano.function([input_var, target_var], loss, updates=updates)
+        val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
+        preds = theano.function([input_var],test_prediction)
 
     history_train_errs = []
     history_valid_errs = []
@@ -302,15 +335,27 @@ def main(model='custom_mlp: ',
             t_idx += 1
             inputs = [[train[0][idx] for idx in batch],[train[1][idx] for idx in batch]]
             target = [train[2][idx] for idx in batch]
+            if cat != 1:
+                prev_inputs = [train_prev_cat[idx] for idx in batch]
+                print(len(prev_inputs))
+                target = [train[cat + 1][idx] for idx in batch]
+                prev_inputs = one_hot_encode_features(prev_inputs,
+                    n_values = n_values[n_val_keys[cat]])
+                print(prev_inputs.shape)
             desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
             brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
-            #target = one_hot_encode_features(target, n_values = n_values['y_1'])
             inputs = np.hstack((desc, brands))
-            train_err += train_fn(inputs, target)
+            if cat != 1:
+                train_err += train_fn(inputs, prev_inputs, target)
+            else:
+                train_err += train_fn(inputs, target)
             train_batches += 1
 
             if t_idx % valid_freq == 0:
-                err, acc = val_fn(train[0],train[1])
+                if cat != 1:
+                    err, acc = val_fn(inputs, prev_inputs, target)
+                else:
+                    err, acc = val_fn(inputs,target)
                 history_train_errs.append(err, acc)
                 np.savez(save_path + saveto,
                         history_train_errs=history_train_errs,
@@ -325,23 +370,32 @@ def main(model='custom_mlp: ',
         for batch in iterate_minibatches(valid[0],valid[1], batch_size, shuffle=False):
             inputs = [[valid[0][idx] for idx in batch],[valid[1][idx] for idx in batch]]
             target = [valid[2][idx] for idx in batch]
+            if cat != 1:
+                prev_inputs = [valid_prev_cat[idx] for idx in batch]
+                target = [valid[cat + 1][idx] for idx in batch]
+                prev_inputs = one_hot_encode_features(prev_inputs,
+                    n_values = n_values[n_val_keys[cat]])
             desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
             brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
-            #target = one_hot_encode_features(target, n_values = n_values['y_1'])
             inputs = np.hstack((desc, brands))
-            err, acc = val_fn(inputs, target)
+            if cat != 1:
+                err, acc = val_fn(inputs, prev_inputs, target)
+            else:
+                err, acc = val_fn(inputs, target)
             val_err += err
             val_acc += acc
             val_batches += 1
 
             if t_idx % valid_freq == 0:
-                err, acc = val_fn(train[0],train[1])
+                if cat != 1:
+                    err, acc = val_fn(inputs, prev_inputs, target)
+                else:
+                    err, acc = val_fn(inputs, target)
                 history_train_errs.append(err, acc)
                 print('saving...')
                 np.savez(save_path + saveto,
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
-                        layers = lasagne.layers.get_all_layers(network)
                          *lasagne.layers.get_all_param_values(network))
 
         # Then we print the results for this epoch:
@@ -361,14 +415,26 @@ def main(model='custom_mlp: ',
     test_err = 0
     test_acc = 0
     test_batches = 0
+    test_preds = np.zeros(len(test[0]))
     for batch in iterate_minibatches(test[0],test[2], batch_size, shuffle=False):
         inputs = [[test[0][idx] for idx in batch],[test[1][idx] for idx in batch]]
         target = [test[2][idx] for idx in batch]
         desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
         brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
-        #target = one_hot_encode_features(target, n_values = n_values['y_1'])
+        if cat != 1:
+                prev_inputs = [test_prev_cat[idx] for idx in batch]
+                target = [test[cat + 1][idx] for idx in batch]
+                prev_inputs = one_hot_encode_features(prev_inputs,
+                    n_values = n_values[n_val_keys[cat]])
         inputs = np.hstack((desc, brands))
-        err, acc = val_fn(inputs, target)
+        if cat != 1:
+            err, acc = val_fn(inputs, prev_inputs, target)
+            pred_prob = preds(inputs, prev_inputs)
+        else:
+            err, acc = val_fn(inputs, target)
+            pred_prob = preds(inputs)
+        pred = pred_prob.argmax(axis = 1)
+        test_preds[batch[0]:batch[-1]+1] = pred
         test_err += err
         test_acc += acc
         test_batches += 1
@@ -384,12 +450,54 @@ def main(model='custom_mlp: ',
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
                         layers = lasagne.layers.get_all_layers(network),
+                        predictions = test_preds,
                          *lasagne.layers.get_all_param_values(network))
+
+    param_values = lasagne.layers.get_all_param_values(network)
     #
     # And load them again later on like this:
     # with np.load('model.npz') as f:
     #     param_values = [f['arr_%d' % i] for i in range(len(f.files))]
     # lasagne.layers.set_all_param_values(network, param_values)
+
+    return param_values, test_preds
+
+def main():
+
+    #set variable values that will be used by all models
+    desc_n_values = 5000
+    epochs = 5
+    depth = 10
+    width = 256
+    save_path = '../results/test_mlp/'
+
+    # Load the dataset
+    print("Loading data...")
+    data, n_values = get_data(
+        test_size=100,  # If >0, we keep only this number of test example.
+        train_size = 2500, # If >0, we keep only this number of train example.
+        valid_portion = 0.1,
+        desc_n_values = desc_n_values)
+
+    #create model
+    params, preds_2 = train_model(model='classifier_layer', 
+        data = data,
+        n_values = n_values,
+        num_epochs=epochs,
+        desc_n_values = desc_n_values,
+        depth = depth,
+        width = width,
+        drop_in = 0.2,
+        drop_hid = 0.5,
+        batch_size = 32,
+        learning_rate = 0.01,
+        valid_freq = 100,
+        save_path = save_path,
+        saveto = 'test_mlp_2.npz',
+        reload_model = save_path + 'test_mlp_1.npz',
+        shared_params = None,
+        cat = 2,
+        prev_predictions = None)
 
 
 if __name__ == '__main__':

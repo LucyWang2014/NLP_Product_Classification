@@ -2,7 +2,7 @@
 
 #PBS -q cuda
 #PBS -l nodes=1:ppn=2:gpus=1
-#PBS -l walltime=25:00:00
+#PBS -l walltime=2:00:00
 #PBS -l mem=8GB
 #PBS -N vgg1
 #PBS -j oe

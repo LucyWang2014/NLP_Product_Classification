@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pdb
 import theano
 import cPickle as pkl
-import image_download as dl
+import download_images_to_directory as dl
 
 print "Theano device:",theano.config.device
 

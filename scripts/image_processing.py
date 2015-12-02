@@ -143,13 +143,14 @@ if __name__ == '__main__':
     last_idx=None
     dataset="train"
     datadir = DATADIR
+    out_pickle_name='train_image_features'
 
     get_selected_image_features(csv_name,
                                 first_idx,
                                 last_idx,
                                 dataset,
                                 datadir,
-                                out_pickle_name='image_features',
+                                out_pickle_name,
                                 width=224,
                                 filetype='jpg')
     end_time = datetime.now()

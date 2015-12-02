@@ -9,7 +9,6 @@ import sys
 import os
 import time
 import cPickle
-import time
 import collections
 
 import numpy as np
@@ -31,7 +30,10 @@ def get_data(
     train_size = 2500, # If >0, we keep only this number of train example.
     valid_portion = 0.1, # percent of training data for validation set
     desc_n_values = 5000, # percent of training data for validation set
-):
+    ):
+    '''
+    returns text data and n_values
+    '''
 
     f_train = open(path + 'nordstrom_train.pkl', 'rb')
     f_test = open(path + 'nordstrom_test.pkl', 'rb')
@@ -50,6 +52,7 @@ def get_data(
     # split training set into validation set
     train_desc, train_brands, train_y_1, train_y_2, train_y_3 = train_set
     n_samples = len(train_y_1)
+    #PROBLEM? due to missing numbers in training index, max(training index) may be greater than len(train_y_1)
     sidx = np.random.permutation(n_samples)
     n_train = int(np.round(n_samples * (1. - valid_portion)))
     valid_desc = [train_desc[s] for s in sidx[n_train:]]
@@ -148,7 +151,7 @@ def build_mlp(input_var=None, layer_shape = None, num_units = None):
     return l_out
 
 def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=.2,
-                     drop_hidden=.5, layer_shape = None, num_units = None):
+    drop_hidden=.5, layer_shape = None, num_units = None):
     # By default, this creates the same network as `build_mlp`, but it can be
     # customized with respect to the number and size of hidden layers. This
     # mostly showcases how creating a network in Python code can be a lot more
@@ -218,12 +221,6 @@ def iterate_minibatches(inputs, target, batchsize, shuffle=False):
 
     return batches
 
-
-# ############################## Main program ################################
-# Everything else will be handled in our main program now. We could pull out
-# more functions to better separate the code, but it wouldn't make it any
-# easier to read.
-
 def train_model(model='custom_mlp: ', 
     data = None,
     n_values = None,
@@ -242,6 +239,28 @@ def train_model(model='custom_mlp: ',
     shared_params = None,
     cat = 1,
     prev_predictions = None):
+
+    '''
+    args:
+        model: 'mlp', custom_mlp:','classifier_layer', or forthcoming 'image_model','multi-modal'
+        data: data
+        n_values: number of values ?
+        num_epochs: number of epochs before quitting
+        desc_n_values: 
+        depth: how many layers in network
+        width: units in each hidden layer
+        drop_in: dropout rate for input
+        drop_hid: dropout rate in hidden layers
+        batch_size: how many to run at a time
+        learning_rate: learning rate of SGD
+        valid_freq: how often to validate
+        save_path: where to save the resulting model
+        saveto: name of the file where saving
+        reload_model = None,
+        shared_params = None,
+        cat = 1,
+        prev_predictions = None):
+    '''
 
     train, valid, test = data
 
@@ -304,7 +323,11 @@ def train_model(model='custom_mlp: ',
     test_loss = lasagne.objectives.categorical_crossentropy(test_prediction,
                                                             target_var)
     test_loss = test_loss.mean()
+
+    #TODO: three target layers, loss is the sum of the three.  
+
     # As a bonus, also create an expression for the classification accuracy:
+    # TODO: separate accuracy for the three
     test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), target_var),
                       dtype=theano.config.floatX)
 
@@ -463,6 +486,9 @@ def train_model(model='custom_mlp: ',
     return param_values, test_preds
 
 def main():
+    '''
+    set parameters,load data and train model
+    '''
 
     #set variable values that will be used by all models
     desc_n_values = 5000

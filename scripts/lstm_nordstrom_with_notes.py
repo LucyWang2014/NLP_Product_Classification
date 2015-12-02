@@ -103,7 +103,7 @@ def init_params(options):
                                               prefix=options['encoder'])
 
     # classifier (change the dimensions here for concatenated features)
-    params['U'] = 0.01 * numpy.random.randn(options['dim_proj'], #change dim_proj to total combined 
+    params['U'] = 0.01 * numpy.random.randn(options['final_proj'], #change dim_proj to total combined 
                                             options['ydim']).astype(config.floatX)
     params['b'] = numpy.zeros((options['ydim'],)).astype(config.floatX)
 

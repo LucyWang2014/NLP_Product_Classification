@@ -61,10 +61,6 @@ def prepare_data(seqs, labels, maxlen=None, **kwargs):
         x[:lengths[idx], idx] = s
         x_mask[:lengths[idx], idx] = 1.
 
-    return x, x_mask, labels
-
-def add_data(**kwargs):
-
     add_features = []
     for key, value in kwargs.iteritems():
         if value is not None:
@@ -74,7 +70,8 @@ def add_data(**kwargs):
 
     add_features = numpy.concatenate(tuple(add_features), axis = 1)
 
-    return add_features
+
+    return x, x_mask, add_features, labels
 
 def get_dataset_file(dataset, default_dataset):
     '''Look for it as if it was a full path, if not, try local file,

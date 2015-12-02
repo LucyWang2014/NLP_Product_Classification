@@ -171,7 +171,12 @@ def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=.2,
             network = lasagne.layers.dropout(network, p=drop_hidden)
     # Output layer:
     softmax = lasagne.nonlinearities.softmax
-    network = lasagne.layers.DenseLayer(network, num_units, nonlinearity=softmax)
+    if type(num_units) == list:
+        network = []
+        for idx, num_unit in enumerate(num_units):
+            network[idx] = lasagne.layers.DenseLayer(network, num_units[idx], nonlinearity=softmax)
+    else:
+        network = lasagne.layers.DenseLayer(network, num_units, nonlinearity=softmax)
     return network
 
 def classifier_layer(network, prev_cat, num_units, layer_shape = None):
@@ -193,6 +198,45 @@ def classifier_layer(network, prev_cat, num_units, layer_shape = None):
     network = lasagne.layers.DenseLayer(network, num_units, nonlinearity=softmax)
 
     return network
+
+def multimodal(network, images, num_units, layer_shape = None):
+    #This takes in a pretrained network and concatenates it with additional
+    #features. Then the combined layer is fed into the output layer
+
+    #get all layers from the pretrained network and gets the last layer before the output layer
+    layers = lasagne.layers.get_all_layers(network)
+    output = lasagne.layers.get_output(layers[-2])
+
+    #concatenate the output with additional layers
+    network = T.concatenate([output, prev_cat], axis = 1)
+    l_in = lasagne.layers.InputLayer(shape=(None, layer_shape),
+                                     input_var=network)
+
+    # Apply 20% dropout to the input data:
+    l_in_drop = lasagne.layers.DropoutLayer(l_in, p=0.2)
+
+    # Add a fully-connected layer of 800 units, using the linear rectifier, and
+    # initializing weights with Glorot's scheme (which is the default anyway):
+    l_hid1 = lasagne.layers.DenseLayer(
+            l_in_drop, num_units=800,
+            nonlinearity=lasagne.nonlinearities.rectify,
+            W=lasagne.init.GlorotUniform())
+
+    # We'll now add dropout of 50%:
+    l_hid1_drop = lasagne.layers.DropoutLayer(l_hid1, p=0.5)
+
+    # Another 800-unit layer:
+    l_hid2 = lasagne.layers.DenseLayer(
+            l_hid1_drop, num_units=800,
+            nonlinearity=lasagne.nonlinearities.rectify)
+
+    # 50% dropout again:
+    l_hid2_drop = lasagne.layers.DropoutLayer(l_hid2, p=0.5)
+
+    # Finally, we'll add the fully-connected output layer, of 10 softmax units:
+    l_out = lasagne.layers.DenseLayer(
+            l_hid2_drop, num_units=num_units,
+            nonlinearity=lasagne.nonlinearities.softmax)
 
 # ############################# Batch iterator ###############################
 # This is just a simple helper function iterating over training data in
@@ -224,7 +268,8 @@ def iterate_minibatches(inputs, target, batchsize, shuffle=False):
 # more functions to better separate the code, but it wouldn't make it any
 # easier to read.
 
-def train_model(model='custom_mlp: ', 
+def train_model(model='custom_mlp: ',
+    mode = 'simple', #select either simple or dependent models 
     data = None,
     n_values = None,
     num_epochs=5,
@@ -245,7 +290,7 @@ def train_model(model='custom_mlp: ',
 
     train, valid, test = data
 
-    layer_shape = desc_n_values + n_values['brands']
+    layer_shape = desc_n_values + n_values['brands'] #CG TODO: add image dimensions here
 
     # Prepare Theano variables for inputs and target
     input_var = T.matrix('inputs',dtype='int64')
@@ -288,6 +333,8 @@ def train_model(model='custom_mlp: ',
     prediction = lasagne.layers.get_output(network)
     loss = lasagne.objectives.categorical_crossentropy(prediction, target_var)
     loss = loss.mean()
+
+
     # We could add some weight decay as well here, see lasagne.regularization.
 
     # Create update expressions for training, i.e., how to modify the
@@ -345,6 +392,244 @@ def train_model(model='custom_mlp: ',
             desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
             brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
             inputs = np.hstack((desc, brands))
+            if cat != 1:
+                train_err += train_fn(inputs, prev_inputs, target)
+            else:
+                train_err += train_fn(inputs, target)
+            train_batches += 1
+
+            if t_idx % valid_freq == 0:
+                if cat != 1:
+                    err, acc = val_fn(inputs, prev_inputs, target)
+                else:
+                    err, acc = val_fn(inputs,target)
+                history_train_errs.append(err, acc)
+                np.savez(save_path + saveto,
+                        history_train_errs=history_train_errs,
+                        history_valid_errs = history_valid_errs,
+                        layers = lasagne.layers.get_all_layers(network),
+                         *lasagne.layers.get_all_param_values(network))
+
+        # And a full pass over the validation data:
+        val_err = 0
+        val_acc = 0
+        val_batches = 0
+        for batch in iterate_minibatches(valid[0],valid[1], batch_size, shuffle=False):
+            inputs = [[valid[0][idx] for idx in batch],[valid[1][idx] for idx in batch]]
+            target = [valid[2][idx] for idx in batch]
+            #add image vectors here
+            if cat != 1:
+                prev_inputs = [valid_prev_cat[idx] for idx in batch]
+                target = [valid[cat + 1][idx] for idx in batch]
+                prev_inputs = one_hot_encode_features(prev_inputs,
+                    n_values = n_values[n_val_keys[cat]])
+            desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
+            brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
+            inputs = np.hstack((desc, brands)) #hstack image vectors
+            if cat != 1:
+                err, acc = val_fn(inputs, prev_inputs, target)
+            else:
+                err, acc = val_fn(inputs, target)
+            val_err += err
+            val_acc += acc
+            val_batches += 1
+
+            if t_idx % valid_freq == 0:
+                if cat != 1:
+                    err, acc = val_fn(inputs, prev_inputs, target)
+                else:
+                    err, acc = val_fn(inputs, target)
+                history_train_errs.append(err, acc)
+                print('saving...')
+                np.savez(save_path + saveto,
+                        history_train_errs=history_train_errs,
+                        history_valid_errs = history_valid_errs,
+                         *lasagne.layers.get_all_param_values(network))
+
+        # Then we print the results for this epoch:
+        print("Epoch {} of {} took {:.3f}s".format(
+            epoch + 1, num_epochs, time.time() - start_time))
+        print("  training loss:\t\t{:.6f}".format(train_err / train_batches))
+        print("  validation loss:\t\t{:.6f}".format(val_err / val_batches))
+        print("  validation accuracy:\t\t{:.2f} %".format(
+            val_acc / val_batches * 100))
+
+
+    end_time = time.time()
+    print("The code ran for %d epochs, with %f sec/epochs" % (
+        (num_epochs), (end_time - start_time) / (1. * (num_epochs))))
+
+    # After training, we compute and print the test error:
+    test_err = 0
+    test_acc = 0
+    test_batches = 0
+    test_preds = np.zeros(len(test[0]))
+    for batch in iterate_minibatches(test[0],test[2], batch_size, shuffle=False):
+        inputs = [[test[0][idx] for idx in batch],[test[1][idx] for idx in batch]]
+        target = [test[2][idx] for idx in batch]
+        desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
+        brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
+        if cat != 1:
+                prev_inputs = [test_prev_cat[idx] for idx in batch]
+                target = [test[cat + 1][idx] for idx in batch]
+                prev_inputs = one_hot_encode_features(prev_inputs,
+                    n_values = n_values[n_val_keys[cat]])
+        inputs = np.hstack((desc, brands))
+        if cat != 1:
+            err, acc = val_fn(inputs, prev_inputs, target)
+            pred_prob = preds(inputs, prev_inputs)
+        else:
+            err, acc = val_fn(inputs, target)
+            pred_prob = preds(inputs)
+        pred = pred_prob.argmax(axis = 1)
+        test_preds[batch[0]:batch[-1]+1] = pred
+        test_err += err
+        test_acc += acc
+        test_batches += 1
+    print("Final results:")
+    print("  test loss:\t\t\t{:.6f}".format(test_err / test_batches))
+    print("  test accuracy:\t\t{:.2f} %".format(
+        test_acc / test_batches * 100))
+
+    # Optionally, you could now dump the network weights to a file like this:
+    np.savez(save_path + saveto,train_err=train_err / train_batches,
+                        valid_err=val_err / val_batches, 
+                        test_err=test_err / test_batches,
+                        history_train_errs=history_train_errs,
+                        history_valid_errs = history_valid_errs,
+                        layers = lasagne.layers.get_all_layers(network),
+                        predictions = test_preds,
+                         *lasagne.layers.get_all_param_values(network))
+
+    param_values = lasagne.layers.get_all_param_values(network)
+    #
+    # And load them again later on like this:
+    # with np.load('model.npz') as f:
+    #     param_values = [f['arr_%d' % i] for i in range(len(f.files))]
+    # lasagne.layers.set_all_param_values(network, param_values)
+
+    return param_values, test_preds
+
+def train_simple_model(model='custom_mlp: ', 
+    data = None,
+    n_values = None,
+    num_epochs=5,
+    desc_n_values = 5000,
+    depth = 10,
+    width = 256,
+    drop_in = 0.2,
+    drop_hid = 0.5,
+    batch_size = 32,
+    learning_rate = 0.01,
+    valid_freq = 100,
+    save_path = '../results/',
+    saveto = 'test_mlp.npz',
+    reload_model = None,
+    shared_params = None,
+    cat = 1,
+    prev_predictions = None):
+
+    train, valid, test = data
+
+    layer_shape = desc_n_values + n_values['brands'] #CG TODO: add image dimensions here
+
+    # Prepare Theano variables for inputs and target
+    input_var = T.matrix('inputs',dtype='int64')
+    target_var_1 = T.ivector('target')
+    target_var_2 = T.ivector('target')
+    target_var_3 = T.ivector('target')
+
+    n_val_keys = n_values.keys()
+
+    # Create neural network model (depending on first command line parameter)
+    start_time = time.time()
+    print("Building model and compiling functions...")
+    if model == 'mlp':
+        network = build_mlp(input_var, layer_shape, n_values['y_1'])
+    elif model == 'custom_mlp':
+        #depth, width, drop_in, drop_hid = model.split(':', 1)[1].split(',')
+        #network = build_custom_mlp(input_var, int(depth), int(width),
+        #                          float(drop_in), float(drop_hid))
+        network = build_custom_mlp(input_var, 
+            depth, width, drop_in, drop_hid, 
+            layer_shape, [[n_values['y_1'],[n_values['y_2'],[n_values['y_3']])
+    elif model == 'multimodal':
+        network = build_custom_mlp(input_var, depth, width, drop_in, drop_hid, layer_shape, n_values['y_1'])
+        network = ""
+        network = build_mlp(input_var, layer_shape, n_values['y_1'])
+    else:
+        print("Unrecognized model type %r." % model)
+        return
+
+    # Create a loss expression for training, i.e., a scalar objective we want
+    # to minimize (for our multi-class problem, it is the cross-entropy loss):
+    prediction_1 = lasagne.layers.get_output(network[0])
+    prediction_2 = lasagne.layers.get_output(network[1])
+    prediction_3 = lasagne.layers.get_output(network[2])
+    loss = lasagne.objectives.categorical_crossentropy(prediction_1, target_var_1) +
+        lasagne.objectives.categorical_crossentropy(prediction_2, target_var_2) + 
+        lasagne.objectives.categorical_crossentropy(prediction_3, target_var_3)
+    loss = loss.mean()
+
+
+    # We could add some weight decay as well here, see lasagne.regularization.
+
+    # Create update expressions for training, i.e., how to modify the
+    # parameters at each training step. Here, we'll use adadelta,
+    # but Lasagne offers plenty more.
+    params = lasagne.layers.get_all_params(network[0], trainable=True)
+    updates = lasagne.updates.adadelta(
+            loss, params, learning_rate=0.01)
+
+    # Create a loss expression for validation/testing. The crucial difference
+    # here is that we do a deterministic forward pass through the network,
+    # disabling dropout layers.
+    test_prediction = lasagne.layers.get_output(network, deterministic=True)
+    test_loss_1 = test_loss_1.mean()
+    test_loss_2 = test_loss_2.mean()
+    test_loss_3 = test_loss_3.mean()
+    # As a bonus, also create an expression for the classification accuracy:
+    test_acc = T.mean(T.eq(T.argmax(test_prediction, axis=1), target_var),
+                      dtype=theano.config.floatX)
+
+    # Compile a function performing a training step on a mini-batch (by giving
+    # the updates dictionary) and returning the corresponding training loss:
+    if cat != 1:
+        train_fn = theano.function([input_var, prev_cat_var, target_var], loss, updates=updates)
+        # Compile a second function computing the validation loss and accuracy:
+        val_fn = theano.function([input_var, prev_cat_var, target_var], [test_loss, test_acc])
+        preds = theano.function([input_var, prev_cat_var],test_prediction)
+    else:
+        train_fn = theano.function([input_var, target_var], loss, updates=updates)
+        val_fn = theano.function([input_var, target_var], [test_loss, test_acc])
+        preds = theano.function([input_var],test_prediction)
+
+    history_train_errs = []
+    history_valid_errs = []
+    # Finally, launch the training loop.
+    print("Starting training...")
+    # We iterate over epochs:
+    for epoch in range(num_epochs):
+        # In each epoch, we do a full pass over the training data:
+        train_err = 0
+        train_batches = 0
+        start_time = time.time()
+        t_idx = 0
+        for batch in iterate_minibatches(train[0], train[1], batch_size, shuffle=True):
+            t_idx += 1
+            inputs = [[train[0][idx] for idx in batch],[train[1][idx] for idx in batch]]
+            target = [train[2][idx] for idx in batch]
+            #CG TODO: iterate over image vectors
+            if cat != 1:
+                prev_inputs = [train_prev_cat[idx] for idx in batch]
+                print(len(prev_inputs))
+                target = [train[cat + 1][idx] for idx in batch]
+                prev_inputs = one_hot_encode_features(prev_inputs,
+                    n_values = n_values[n_val_keys[cat]])
+                print(prev_inputs.shape)
+            desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
+            brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
+            inputs = np.hstack((desc, brands)) #CG TODO: hstack with images as well
             if cat != 1:
                 train_err += train_fn(inputs, prev_inputs, target)
             else:
@@ -489,7 +774,7 @@ def main():
         width = width,
         drop_in = 0.2,
         drop_hid = 0.5,
-        batch_size = 32,
+        batch_size = 256,
         learning_rate = 0.01,
         valid_freq = 100,
         save_path = save_path,

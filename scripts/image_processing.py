@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import numpy as np
+import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -87,14 +88,65 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     ll = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], im, deterministic=True).eval())
     return ll
 
-DATADIR = "/scratch/cdg356/spring/data/"
-MODEL, MEAN_IMAGE = load_pretrained_model(DATADIR)
-LAST_LAYER = build_image_network()
+def get_selected_image_features(csv_name,
+                                first_idx,
+                                last_idx,
+                                dataset,
+                                datadir,
+                                out_pickle_name='image_features.pkl',
+                                width=224,
+                                filetype='jpg'):
+    '''
+    for a given index range, download and resize the images,
+    then save to directory
 
-url="http://content.nordstrom.com/imagegallery/store/product/large/9/_8947109.jpg"
-i=0
-dataset="train"
-width=224
-filetype="jpg"
-pdb.set_trace()
-extract_image_features(url,i,dataset,DATADIR,width,filetype)
+    args:
+        csv_name: name of csv
+        first_idx: int or None. last index of range of images to download
+        last_idx: int or None. last index of range of images to download
+        dataset: string 'train' or 'test' or other identifier
+
+    returns:
+        none
+    '''
+    data = pd.read_csv(datadir+csv_name,header = 0, index_col = 0,low_memory = False)
+    image_urls = data.large_image_URL.loc[first_idx:last_idx]
+    featureDF = pd.DataFrame()
+
+    #iterate through index and url
+    for i,url in image_urls.iteritems():
+        image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
+        featureDF.loc[i,'image_feature']=image_feature
+
+    with open(datadir+out_pickle_name) as outf:
+        pkl.dump(featureDF)
+
+    with open('image_feature_test.csv') as outf:
+        featureDF.to_csv(outf, header=True, index=True)
+
+DATADIR = "/scratch/cdg356/spring/data/"
+PRETRAINED_VGG, MEAN_IMAGE = load_pretrained_model(DATADIR)
+IMAGE_NET = build_image_network()
+
+if __name__ == '__main__':
+    from datetime import datetime
+    start_time = datetime.now()
+
+    csv_name='head_train_set.csv'
+    first_idx=None
+    last_idx=None
+    dataset="train"
+    datadir = DATADIR
+
+
+    get_selected_image_features(csv_name,
+                                first_idx,
+                                last_idx,
+                                dataset,
+                                datadir,
+                                out_pickle_name='image_features.pkl',
+                                width=224,
+                                filetype='jpg')
+    end_time = datetime.now()
+    runtime = end_time - start_time
+    print "script runtime: ",runtime

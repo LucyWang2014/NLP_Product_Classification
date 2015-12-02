@@ -72,13 +72,13 @@ def prep_image(url,idx,dataset,datadir,width=224,filetype='jpg'):
         rawim = plt.imread(outpath)
         return rawim
         
-def get_selected_images(csv_path,first_idx,last_idx,dataset,datadir,width=224,filetype='jpg'):
+def get_selected_images(csv_name,first_idx,last_idx,dataset,datadir,width=224,filetype='jpg'):
     '''
     for a given index range, download and resize the images,
     then save to directory
 
     args:
-        csv_path: path to csv
+        csv_name: name of csv (assumed to be in datadir)
         first_idx: int or None. last index of range of images to download
         last_idx: int or None. last index of range of images to download
         dataset: string 'train' or 'test' or other identifier
@@ -86,7 +86,7 @@ def get_selected_images(csv_path,first_idx,last_idx,dataset,datadir,width=224,fi
     returns:
         none
     '''
-    data = pd.read_csv(csv_path,header = 0, index_col = 0,low_memory = False)
+    data = pd.read_csv(datadir+csv_name,header = 0, index_col = 0,low_memory = False)
     image_urls = data.large_image_URL.loc[first_idx:last_idx]
     for i,url in image_urls.iteritems():
         prep_image(url,i,dataset,datadir,width,filetype)
@@ -101,9 +101,7 @@ def main(csv_name,dataset,first_idx,last_idx):
     #hpc datadir
     datadir = '/scratch/cdg356/spring/data/'
     
-    csv_path = datadir + csv_name
-
-    get_selected_images(csv_path,first_idx,last_idx,dataset,datadir)
+    get_selected_images(csv_name,first_idx,last_idx,dataset,datadir)
 
     end_time = datetime.now()
     runtime = end_time - start_time

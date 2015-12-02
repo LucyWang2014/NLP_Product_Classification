@@ -73,7 +73,8 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     returns:
         rawim: scaled and cropped image
     '''
-    print "Extracting features from image index",i
+    if i%10000==0:
+        print "Extracting features from image index",i
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
 
     # Shuffle axes to c01
@@ -113,17 +114,21 @@ def get_selected_image_features(csv_name,
     data = pd.read_csv(datadir+csv_name,header = 0, index_col = 0,low_memory = False)
     image_urls = data.large_image_URL.loc[first_idx:last_idx]
     featureDF = pd.DataFrame()
-
+    ticker=1
     #iterate through index and url
     for i,url in image_urls.iteritems():
         image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
         featureDF.loc[i,'image_feature']=image_feature.astype(object) #NOTE: may need to convert back to float32 with x=featureDF.loc[i,'image_feature'].astype(np.float32)
+        if ticker%100000==0:
+            print "Saving up to image index",i
+            with open(datadir+out_pickle_name + str(i)+'.pkl','wb') as outf:
+                pkl.dump(featureDF,outf)  
 
-    with open(datadir+out_pickle_name,'wb') as outf:
+    with open(datadir+out_pickle_name+'.pkl','wb') as outf:
         pkl.dump(featureDF,outf)
 
-    with open('image_feature_test.csv','wb') as outf:
-        featureDF.to_csv(outf, header=True, index=True)
+    #with open('image_feature_test.csv','wb') as outf:
+    #    featureDF.to_csv(outf, header=True, index=True)
 
 DATADIR = "/scratch/cdg356/spring/data/"
 PRETRAINED_VGG, MEAN_IMAGE = load_pretrained_model(DATADIR)
@@ -133,19 +138,18 @@ if __name__ == '__main__':
     from datetime import datetime
     start_time = datetime.now()
 
-    csv_name='head_train_set.csv'
+    csv_name='train_set.csv'
     first_idx=None
     last_idx=None
     dataset="train"
     datadir = DATADIR
-
 
     get_selected_image_features(csv_name,
                                 first_idx,
                                 last_idx,
                                 dataset,
                                 datadir,
-                                out_pickle_name='image_features.pkl',
+                                out_pickle_name='image_features',
                                 width=224,
                                 filetype='jpg')
     end_time = datetime.now()

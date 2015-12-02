@@ -1,0 +1,21 @@
+
+numpy/intel/1.8.1(28):ERROR:150: Module 'numpy/intel/1.8.1' conflicts with the currently loaded module(s) 'numpy/intel/1.10.1'
+numpy/intel/1.8.1(28):ERROR:102: Tcl command execution failed: conflict ${my_name}
+
+Traceback (most recent call last):
+  File "vgg_pretrained.py", line 34, in <module>
+    import lasagne
+  File "/share/apps/lasagne/20151007/lib/python2.7/site-packages/Lasagne-0.2.dev1-py2.7.egg/lasagne/__init__.py", line 13, in <module>
+    """)
+ImportError: Could not import Theano.
+
+Please make sure you install a recent enough version of Theano.  See
+section 'Install from PyPI' in the installation docs for more details:
+http://lasagne.readthedocs.org/en/latest/user/installation.html#install-from-pypi
+
+
+
+
+
+
+

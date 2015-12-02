@@ -116,12 +116,12 @@ def get_selected_image_features(csv_name,
     #iterate through index and url
     for i,url in image_urls.iteritems():
         image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
-        featureDF.loc[i,'image_feature']=image_feature
+        featureDF.loc[i,'image_feature']=image_feature.astype(object) #NOTE: may need to convert back to float32 with x=featureDF.loc[i,'image_feature'].astype(np.float32)
 
-    with open(datadir+out_pickle_name) as outf:
-        pkl.dump(featureDF)
+    with open(datadir+out_pickle_name,'wb') as outf:
+        pkl.dump(featureDF,outf)
 
-    with open('image_feature_test.csv') as outf:
+    with open('image_feature_test.csv','wb') as outf:
         featureDF.to_csv(outf, header=True, index=True)
 
 DATADIR = "/scratch/cdg356/spring/data/"

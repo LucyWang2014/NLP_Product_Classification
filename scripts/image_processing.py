@@ -73,6 +73,7 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     returns:
         rawim: scaled and cropped image
     '''
+    print "Extracting features from image index",i
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
 
     # Shuffle axes to c01

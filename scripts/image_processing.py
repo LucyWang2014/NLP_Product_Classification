@@ -10,7 +10,7 @@ import theano
 import cPickle as pkl
 import download_images_to_directory as dl
 import logging as lg
-logging.basicConfig(filename='../logs/image_processing.log',level=logging.DEBUG)
+lg.basicConfig(filename='../logs/image_processing.log',level=lg.DEBUG)
 
 print "Theano device:",theano.config.device
 lg.info("Theano device: %s" %theano.config.device)
@@ -125,11 +125,12 @@ def get_selected_image_features(csv_name,
     for i,url in image_urls.iteritems():
         image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
         featureDF.loc[i,'image_feature']=image_feature.astype(object) #NOTE: may need to convert back to float32 with x=featureDF.loc[i,'image_feature'].astype(np.float32)
-        if ticker%10000==0:
+        if ticker%100000==0:
             print "Saving up to image index",i
             lg.info("Saving up to image index %i" %i)
             with open(datadir+out_pickle_name + str(i)+'.pkl','wb') as outf:
                 pkl.dump(featureDF,outf)  
+            ticker+=1
 
     with open(datadir+out_pickle_name+'.pkl','wb') as outf:
         pkl.dump(featureDF,outf)

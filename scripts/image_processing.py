@@ -9,8 +9,11 @@ import pdb
 import theano
 import cPickle as pkl
 import download_images_to_directory as dl
+import logging as lg
+logging.basicConfig(filename='../logs/image_processing.log',level=logging.DEBUG)
 
 print "Theano device:",theano.config.device
+lg.info("Theano device: %s" %theano.config.device)
 
 #dnn requires GPU
 import lasagne
@@ -23,6 +26,7 @@ from lasagne.utils import floatX
 # ### Load the model parameters and metadata
 def load_pretrained_model(datadir):
     print "Loading vgg model..."
+    lg.info ("Loading vgg model...")
     model = pkl.load(open(datadir+'vgg_cnn_s.pkl'))
     #CLASSES = model['synset words']
     mean_image = model['mean image']
@@ -38,6 +42,7 @@ def build_image_network():
     '''
 
     print "Building lasagne net..."
+    lg.info("Building lasagne net...")
     net = {}
     net['input'] = InputLayer((None, 3, 224, 224))
     net['conv1'] = ConvLayer(net['input'], num_filters=96, filter_size=7, stride=2)
@@ -75,6 +80,7 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     '''
     if i%10000==0:
         print "Extracting features from image index",i
+        lg.info("Extracting features from image index %i" %i)
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
 
     # Shuffle axes to c01
@@ -119,8 +125,9 @@ def get_selected_image_features(csv_name,
     for i,url in image_urls.iteritems():
         image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
         featureDF.loc[i,'image_feature']=image_feature.astype(object) #NOTE: may need to convert back to float32 with x=featureDF.loc[i,'image_feature'].astype(np.float32)
-        if ticker%100000==0:
+        if ticker%10000==0:
             print "Saving up to image index",i
+            lg.info("Saving up to image index %i" %i)
             with open(datadir+out_pickle_name + str(i)+'.pkl','wb') as outf:
                 pkl.dump(featureDF,outf)  
 
@@ -156,3 +163,4 @@ if __name__ == '__main__':
     end_time = datetime.now()
     runtime = end_time - start_time
     print "script runtime: ",runtime
+    lg.info("script runtime: "+str(runtime))

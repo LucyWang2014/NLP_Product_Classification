@@ -13,4 +13,4 @@ module load pandas/intel/0.16.0
 module load pillow/intel/2.7.0
 module load scikit-image/intel/20150129
 
-python download_images_to_directory.py
+python download_images_to_directory.py test_set.csv test

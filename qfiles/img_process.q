@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #PBS -l nodes=1:ppn=2:gpus=1
-#PBS -l walltime=25:00:00
-#PBS -l mem=12GB
+#PBS -l walltime=10:00:00
+#PBS -l mem=30GB
 #PBS -N img_process
 #PBS -j oe
 

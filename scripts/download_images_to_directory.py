@@ -112,14 +112,17 @@ if __name__ == '__main__':
     if len(sys.argv)<2:
         print "usage: python csv_file dataset [first_idx] [last_idx]"
         print "example: python train_set.csv train"
+        print "running train_set.csv train"
         main('train_set.csv','train',None,None)
     elif len(sys.argv)<4:
         csv_name = sys.argv[1]
         dataset = sys.argv[2]
+        print "running main(%s,%s)" %(csv_name,dataset)
         main(csv_name,dataset,None,None)
     else:
         csv_name = sys.argv[1]
         dataset = sys.argv[2]
         first_idx = int(sys.argv[3])
         last_idx = int(sys.argv[4])
+        print "running main(%s,%s,%s,%s)" %(csv_name,dataset,first_idx,last_idx)
         main(csv_name,dataset,first_idx,last_idx)

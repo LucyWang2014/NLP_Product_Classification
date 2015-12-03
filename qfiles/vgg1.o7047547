@@ -1,0 +1,18 @@
+
+/opt/torque/mom_priv/jobs/7047547.SC: line 19: /etc/profile.d/env-modules.sh: No such file or directory
+ModuleCmd_Load.c(208):ERROR:105: Unable to locate a modulefile for 'cudasdk/4.0.17'
+ModuleCmd_Load.c(208):ERROR:105: Unable to locate a modulefile for 'cudatoolkit/4.0.17'
+Using gpu device 0: GeForce GTX TITAN Black
+Theano device: gpu
+Traceback (most recent call last):
+  File "vgg_pretrained.py", line 37, in <module>
+    from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
+  File "/share/apps/lasagne/20151007/lib/python2.7/site-packages/Lasagne-0.2.dev1-py2.7.egg/lasagne/layers/dnn.py", line 13, in <module>
+    raise ImportError("dnn not available")  # pragma: no cover
+ImportError: dnn not available
+
+
+
+
+
+

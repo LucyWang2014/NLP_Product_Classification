@@ -9,11 +9,11 @@ import pdb
 import theano
 import cPickle as pkl
 import download_images_to_directory as dl
-import logging as lg
-lg.basicConfig(filename='../logs/image_processing.log',level=lg.DEBUG)
+import logging as log
+log.basicConfig(filename='../logs/image_processing.log',level=log.DEBUG)
 
 print "Theano device:",theano.config.device
-lg.info("Theano device: %s" %theano.config.device)
+log.info("Theano device: %s" %theano.config.device)
 
 #dnn requires GPU
 import lasagne
@@ -26,7 +26,7 @@ from lasagne.utils import floatX
 # ### Load the model parameters and metadata
 def load_pretrained_model(datadir):
     print "Loading vgg model..."
-    lg.info ("Loading vgg model...")
+    log.info ("Loading vgg model...")
     model = pkl.load(open(datadir+'vgg_cnn_s.pkl'))
     #CLASSES = model['synset words']
     mean_image = model['mean image']
@@ -42,7 +42,7 @@ def build_image_network():
     '''
 
     print "Building lasagne net..."
-    lg.info("Building lasagne net...")
+    log.info("Building lasagne net...")
     net = {}
     net['input'] = InputLayer((None, 3, 224, 224))
     net['conv1'] = ConvLayer(net['input'], num_filters=96, filter_size=7, stride=2)
@@ -80,7 +80,7 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     '''
     if i%10000==0:
         print "Extracting features from image index",i
-        lg.info("Extracting features from image index %i" %i)
+        log.info("Extracting features from image index %i" %i)
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
 
     # Shuffle axes to c01
@@ -96,7 +96,7 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     ll = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], im, deterministic=True).eval())
     return ll
 
-def get_selected_image_features(csv_name,
+def get_selected_image_features(df,
                                 first_idx,
                                 last_idx,
                                 dataset,
@@ -109,7 +109,7 @@ def get_selected_image_features(csv_name,
     then save to directory
 
     args:
-        csv_name: name of csv
+        df: dataframe where image urls are
         first_idx: int or None. last index of range of images to download
         last_idx: int or None. last index of range of images to download
         dataset: string 'train' or 'test' or other identifier
@@ -117,7 +117,7 @@ def get_selected_image_features(csv_name,
     returns:
         none
     '''
-    data = pd.read_csv(datadir+csv_name,header = 0, index_col = 0,low_memory = False)
+    data = df
     image_urls = data.large_image_URL.loc[first_idx:last_idx]
     featureDF = pd.DataFrame()
     ticker=1
@@ -127,13 +127,15 @@ def get_selected_image_features(csv_name,
         featureDF.loc[i,'image_feature']=image_feature.astype(object) #NOTE: may need to convert back to float32 with x=featureDF.loc[i,'image_feature'].astype(np.float32)
         if ticker%100000==0:
             print "Saving up to image index",i
-            lg.info("Saving up to image index %i" %i)
+            log.info("Saving up to image index %i" %i)
             with open(datadir+out_pickle_name + str(i)+'.pkl','wb') as outf:
                 pkl.dump(featureDF,outf)  
             ticker+=1
 
     with open(datadir+out_pickle_name+'.pkl','wb') as outf:
         pkl.dump(featureDF,outf)
+
+    return featureDF
 
     #with open('image_feature_test.csv','wb') as outf:
     #    featureDF.to_csv(outf, header=True, index=True)
@@ -164,4 +166,4 @@ if __name__ == '__main__':
     end_time = datetime.now()
     runtime = end_time - start_time
     print "script runtime: ",runtime
-    lg.info("script runtime: "+str(runtime))
+    log.info("script runtime: "+str(runtime))

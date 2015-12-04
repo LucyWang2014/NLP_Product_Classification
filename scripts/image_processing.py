@@ -96,11 +96,11 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     ll = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], im, deterministic=True).eval())
     return ll
 
-def get_selected_image_features(df,
-                                first_idx,
-                                last_idx,
+def get_selected_image_features(datadir,
                                 dataset,
-                                datadir,
+                                iloc0,
+                                iloc1,
+                                save_freq,
                                 out_pickle_name='image_features.pkl',
                                 width=224,
                                 filetype='jpg'):
@@ -110,32 +110,38 @@ def get_selected_image_features(df,
 
     args:
         df: dataframe where image urls are
-        first_idx: int or None. last index of range of images to download
-        last_idx: int or None. last index of range of images to download
+        iloc0: int or None. first iloc of range of images to download
+        iloc1: int or None. last iloc of range of images to download
         dataset: string 'train' or 'test' or other identifier
 
     returns:
         none
     '''
-    data = df
-    image_urls = data.large_image_URL.loc[first_idx:last_idx]
+    image_urls = df.large_image_URL.iloc[iloc0:iloc1]
     featureDF = pd.DataFrame()
-    ticker=1
+    iloc=iloc0
+    prev_iloc = iloc0
     #iterate through index and url
     for i,url in image_urls.iteritems():
-        image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
-        featureDF.loc[i,'image_feature']=image_feature.astype(object) #NOTE: may need to convert back to float32 with x=featureDF.loc[i,'image_feature'].astype(np.float32)
-        if ticker%100000==0:
-            print "Saving up to image index",i
-            log.info("Saving up to image index %i" %i)
-            with open(datadir+out_pickle_name + str(i)+'.pkl','wb') as outf:
+        #image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
+        #new_row = pd.DataFrame(image_feature.astype(object), columns=['image_feature'],index=[i])
+        new_row = pd.DataFrame(url, columns=['image_feature'],index=[i])
+        
+        try:
+            featureDF=featureDF.append(new_row,verify_integrity=True)
+        except:
+            print "index %i already exists" %i
+            log.info("index %i already exists" %i)
+        if iloc>iloc0 and (iloc%save_freq==0 or iloc==iloc1-1):
+            print "Saving from image iloc %i to image iloc %i" %(prev_iloc,iloc)
+            log.info("Saving up to image iloc %i" %iloc)
+            with open(datadir+out_pickle_name + '_' + str(prev_iloc) + '_' + str(iloc)+'.pkl','wb') as outf:
                 pkl.dump(featureDF,outf)  
-            ticker+=1
+            prev_iloc = iloc
 
-    with open(datadir+out_pickle_name+'.pkl','wb') as outf:
-        pkl.dump(featureDF,outf)
-
-    return featureDF
+            #reset featureDF to save memory
+            featureDF = pd.DataFrame()
+        iloc+=1
 
     #with open('image_feature_test.csv','wb') as outf:
     #    featureDF.to_csv(outf, header=True, index=True)
@@ -149,15 +155,15 @@ if __name__ == '__main__':
     start_time = datetime.now()
 
     csv_name='train_set.csv'
-    first_idx=None
-    last_idx=None
+    iloc0=None
+    iloc1=None
     dataset="train"
     datadir = DATADIR
-    out_pickle_name='train_image_features'
+    out_pickle_name=dataset+'_image_features'
 
     get_selected_image_features(csv_name,
-                                first_idx,
-                                last_idx,
+                                iloc0,
+                                iloc1,
                                 dataset,
                                 datadir,
                                 out_pickle_name,

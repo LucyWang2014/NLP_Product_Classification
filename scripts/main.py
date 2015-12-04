@@ -4,9 +4,9 @@ End-to-end script for running all processes.
 '''
 __author__='Charlie Guthrie'
 
+#LOGGING BOILERPLATE
 from datetime import datetime
 start_time = datetime.now()
-
 import os
 #make log file if it doesn't exist
 if not os.path.exists('logs'):

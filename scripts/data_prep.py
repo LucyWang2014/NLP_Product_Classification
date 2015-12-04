@@ -15,12 +15,16 @@ if not os.path.exists('logs'):
 #logging boilerplate.  To log anything type log.info('stuff you want to log')
 import logging as log
 #log file with filename, HMS time
-log.basicConfig(filename='logs/%s%s.log' %(__file__.split('.')[0],start_time.strftime('%H%M%S')),level=log.DEBUG)
+log.basicConfig(filename='logs/%s%s.log' %(__file__.split('.')[0],start_time.strftime('_%Y%m%d_%H%M%S')),level=log.DEBUG)
 
 
 log.info('importing modules...')
+import pandas as pd
+import numpy as np
+import pdb
+import cPickle as pkl
 import image_processing
-import bag_of_words
+#import bag_of_words
 
 
 #TODO: 
@@ -68,11 +72,13 @@ def train_val_split(df,val_portion):
         valDF  
     '''
     assert val_portion<1 and val_portion>0
-    val_samples = round(df.shape[0]*val_portion)
-    train_samples = samples - val_samples
-    trainDF = sampleDF.iloc[:train_samples,:]
-    valDF = sampleDF.iloc[train_samples:val_samples,:]
+    val_samples = int(df.shape[0]*val_portion)
+    train_samples = df.shape[0] - val_samples
+    trainDF = df.iloc[:train_samples,:]
+    valDF = df.iloc[train_samples:train_samples+val_samples,:]
 
+    assert valDF.shape[0] + trainDF.shape[0] == df.shape[0]
+    assert valDF.shape[1]==trainDF.shape[1]
     return trainDF, valDF
 
 def X_y_split(df,y_label):
@@ -132,27 +138,43 @@ def main(datadir,
     #return data
 
 if __name__ == '__main__':
+    home = os.path.join(os.path.dirname(__file__),'..')
+    #local datadir
+    datadir = os.path.join(home,'data') + '/'
 
-    DATADIR = "/scratch/cdg356/spring/data/"
-    trainpath = DATADIR + 'head_train_set.csv'
-    testpath = DATADIR + 'head_test_set.csv'
-    train_samples=1000
-    test_samples=1000
+    #hpc datadir
+    #datadir = '/scratch/cdg356/spring/data/'
+
+    trainpath = datadir + 'head_train_set.csv'
+    testpath = datadir + 'head_test_set.csv'
+    train_samples=100
+    test_samples=100
     val_portion=0.1
     y_label='cat_1_num'
-    first_idx=None
-    last_idx=None
-    dataset="train"
-    datadir = DATADIR
-    out_pickle_name='train_image_features'
+    use_images=False
+    use_text=False
     
-    trainDF, valDF, testDF = main()
+    trainDF, valDF, testDF = main(datadir,
+                                trainpath,
+                                testpath,
+                                train_samples,
+                                test_samples,
+                                val_portion,
+                                y_label,
+                                use_images,
+                                use_text)
 
-    image_processing.get_selected_image_features(trainDF,
-                                    first_idx,
-                                    last_idx,
-                                    dataset,
-                                    datadir,
-                                    out_pickle_name,
-                                    width=224,
-                                    filetype='jpg')
+    dataset="train"
+    iloc0=0
+    iloc1=train_samples
+    save_freq=100
+    out_pickle_name=dataset+'_image_features'
+
+    image_processing.get_selected_image_features(datadir,
+                                dataset,
+                                iloc0,
+                                iloc1,
+                                save_freq,
+                                out_pickle_name,
+                                width=224,
+                                filetype='jpg')

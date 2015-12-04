@@ -79,7 +79,6 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     returns:
         rawim: scaled and cropped image
     '''
-    t0 = datetime.now()
     if i%10000==0:
         print "Extracting features from image index",i
         log.info("Extracting features from image index %i" %i)
@@ -92,12 +91,8 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
 
     im = im - MEAN_IMAGE
     im=floatX(im[np.newaxis])
-    t1 = datetime.now()
-    print "Time to process image: ",(t1-t0)
     #get last layer from vgg model
     ll = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], im, deterministic=True).eval())
-    t2 = datetime.now()
-    print "Time to extract feature: ",(t2-t1)
     return ll
 
 def get_selected_image_features(df,
@@ -128,7 +123,9 @@ def get_selected_image_features(df,
     prev_iloc = iloc0
     #iterate through index and url
     for i,url in image_urls.iteritems():
-        t0 = datetime.now()
+        if iloc%(save_freq/100)==0:
+            print "extracting image feature iloc %i, index %i" %(iloc,i)
+            log.info("extracting image feature iloc %i, index %i" %(iloc,i))
         image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
         new_row = pd.DataFrame(None, columns=['image_feature'],index=[i])
         #new_row = pd.DataFrame(url, columns=['image_feature'],index=[i])
@@ -141,7 +138,7 @@ def get_selected_image_features(df,
             log.info("index %i already exists" %i)
         if iloc>iloc0 and (iloc%save_freq==0 or iloc==iloc1-1):
             print "Saving from image iloc %i to image iloc %i" %(prev_iloc,iloc)
-            log.info("Saving up to image iloc %i" %iloc)
+            log.info("Saving from image iloc %i to image iloc %i" %(prev_iloc,iloc))
             with open(datadir+out_pickle_name + '_' + str(prev_iloc) + '_' + str(iloc)+'.pkl','wb') as outf:
                 pkl.dump(featureDF,outf)  
             prev_iloc = iloc
@@ -149,8 +146,6 @@ def get_selected_image_features(df,
             #reset featureDF to save memory
             featureDF = pd.DataFrame()
         iloc+=1
-        t1 = datetime.now()
-        print "loop iteration:",(t1-t0)
 
 
     #with open('image_feature_test.csv','wb') as outf:

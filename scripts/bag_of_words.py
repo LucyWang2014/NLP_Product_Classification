@@ -5,8 +5,6 @@ Converts product descriptions into bag-of-words representations
 '''
 __author__='Charlie Guthrie'
 
-#TODO: test and debug
-
 import pandas as pd
 from keras.preprocessing.text import Tokenizer
 import cPickle as pkl
@@ -25,7 +23,6 @@ def build_tokenizer(series,nb_words=None,tok_path):
         text_matrix: bag of words matrix representation of text
         dictionary: to identify columns
     '''
-    #TODO: check if tokenizer already exists?
     texts = series
     tok = Tokenizer(nb_words=nb_words)
     tok.fit_on_texts(texts)
@@ -51,7 +48,12 @@ def series_to_bag_of_words(series,tokenizer,text_matrix_path,mode="binary"):
     return pd.DataFrame(text_matrix, index=series.index)
 
 def main():
-    train_df = pd.read_csv('../data/head_train_set.csv',header = 0, index_col = 0,low_memory = False)
+    DATADIR = '/scratch/cdg356/spring/data/'
+    textpath = DATADIR + 'head_train_set.csv'
+    nb_words = 5000
+    tokpath = DATADIR + 'tokenizer_%i.pkl' %nb_words
+    train_df = pd.read_csv(textpath,header = 0, index_col = 0,low_memory = False)
+    build_tokenizer(train_df.description_clean,nb_words,tokpath)
+
     #TODO:
-    # build tokenizer from training set
     # build text matrix from training, validation, test sets

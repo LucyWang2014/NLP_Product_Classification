@@ -28,8 +28,9 @@ import image_processing
 
 
 #TODO: 
-# 1. test and debug train_val_split
+# 1. Validation set currently depends on number of samples.  Need to be aware of this with image processing
 # 2. run image feature extraction on shuffled dataset.  We aren't going to have time to get them all.  
+
 
 def get_brand_index(trainDF,testDF):
     
@@ -147,8 +148,8 @@ if __name__ == '__main__':
 
     trainpath = datadir + 'train_set.csv'
     testpath = datadir + 'test_set.csv'
-    train_samples=1000
-    test_samples=1000
+    train_samples=None
+    test_samples=100
     val_portion=0.1
     y_label='cat_1_num'
     use_images=False
@@ -166,8 +167,8 @@ if __name__ == '__main__':
 
     dataset="train"
     iloc0=0
-    iloc1=200
-    save_freq=100
+    iloc1=100000
+    save_freq=10000
     out_pickle_name=dataset+'_image_features'
 
     image_processing.get_selected_image_features(trainDF,

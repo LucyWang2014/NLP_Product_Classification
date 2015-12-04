@@ -140,15 +140,15 @@ def main(datadir,
 if __name__ == '__main__':
     home = os.path.join(os.path.dirname(__file__),'..')
     #local datadir
-    datadir = os.path.join(home,'data') + '/'
+    #datadir = os.path.join(home,'data') + '/'
 
     #hpc datadir
-    #datadir = '/scratch/cdg356/spring/data/'
+    datadir = '/scratch/cdg356/spring/data/'
 
-    trainpath = datadir + 'head_train_set.csv'
-    testpath = datadir + 'head_test_set.csv'
-    train_samples=100
-    test_samples=100
+    trainpath = datadir + 'train_set.csv'
+    testpath = datadir + 'test_set.csv'
+    train_samples=1000
+    test_samples=1000
     val_portion=0.1
     y_label='cat_1_num'
     use_images=False
@@ -166,11 +166,12 @@ if __name__ == '__main__':
 
     dataset="train"
     iloc0=0
-    iloc1=train_samples
+    iloc1=200
     save_freq=100
     out_pickle_name=dataset+'_image_features'
 
-    image_processing.get_selected_image_features(datadir,
+    image_processing.get_selected_image_features(trainDF,
+                                datadir,
                                 dataset,
                                 iloc0,
                                 iloc1,

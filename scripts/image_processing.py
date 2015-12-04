@@ -10,6 +10,7 @@ import theano
 import cPickle as pkl
 import download_images_to_directory as dl
 import logging as log
+from datetime import datetime
 log.basicConfig(filename='../logs/image_processing.log',level=log.DEBUG)
 
 print "Theano device:",theano.config.device
@@ -78,11 +79,11 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     returns:
         rawim: scaled and cropped image
     '''
+    t0 = datetime.now()
     if i%10000==0:
         print "Extracting features from image index",i
         log.info("Extracting features from image index %i" %i)
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
-
     # Shuffle axes to c01
     im = np.swapaxes(np.swapaxes(rawim, 1, 2), 0, 1)
 
@@ -91,12 +92,16 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
 
     im = im - MEAN_IMAGE
     im=floatX(im[np.newaxis])
-    
+    t1 = datetime.now()
+    print "Time to process image: ",(t1-t0)
     #get last layer from vgg model
     ll = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], im, deterministic=True).eval())
+    t2 = datetime.now()
+    print "Time to extract feature: ",(t2-t1)
     return ll
 
-def get_selected_image_features(datadir,
+def get_selected_image_features(df,
+                                datadir,
                                 dataset,
                                 iloc0,
                                 iloc1,
@@ -123,12 +128,14 @@ def get_selected_image_features(datadir,
     prev_iloc = iloc0
     #iterate through index and url
     for i,url in image_urls.iteritems():
-        #image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
-        #new_row = pd.DataFrame(image_feature.astype(object), columns=['image_feature'],index=[i])
-        new_row = pd.DataFrame(url, columns=['image_feature'],index=[i])
+        t0 = datetime.now()
+        image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
+        new_row = pd.DataFrame(None, columns=['image_feature'],index=[i])
+        #new_row = pd.DataFrame(url, columns=['image_feature'],index=[i])
         
         try:
             featureDF=featureDF.append(new_row,verify_integrity=True)
+            featureDF.loc[i,'image_feature']=image_feature.astype(object)
         except:
             print "index %i already exists" %i
             log.info("index %i already exists" %i)
@@ -142,6 +149,9 @@ def get_selected_image_features(datadir,
             #reset featureDF to save memory
             featureDF = pd.DataFrame()
         iloc+=1
+        t1 = datetime.now()
+        print "loop iteration:",(t1-t0)
+
 
     #with open('image_feature_test.csv','wb') as outf:
     #    featureDF.to_csv(outf, header=True, index=True)
@@ -161,14 +171,6 @@ if __name__ == '__main__':
     datadir = DATADIR
     out_pickle_name=dataset+'_image_features'
 
-    get_selected_image_features(csv_name,
-                                iloc0,
-                                iloc1,
-                                dataset,
-                                datadir,
-                                out_pickle_name,
-                                width=224,
-                                filetype='jpg')
     end_time = datetime.now()
     runtime = end_time - start_time
     print "script runtime: ",runtime

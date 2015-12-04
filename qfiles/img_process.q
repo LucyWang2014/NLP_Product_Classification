@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #PBS -l nodes=1:ppn=2:gpus=1
-#PBS -l walltime=10:00:00
+#PBS -l walltime=20:00:00
 #PBS -l mem=30GB
-#PBS -N img_process
+#PBS -N second_img_process
 #PBS -j oe
 
 cd /home/cdg356/spring/scripts

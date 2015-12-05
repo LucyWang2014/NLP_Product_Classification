@@ -17,14 +17,17 @@ import logging as log
 #log file with filename, HMS time
 log.basicConfig(filename='logs/%s%s.log' %(__file__.split('.')[0],start_time.strftime('_%Y%m%d_%H%M%S')),level=log.DEBUG)
 
+def plog(msg):
+    print msg
+    log.info(msg)
 
 log.info('importing modules...')
 import pandas as pd
 import numpy as np
 import pdb
 import cPickle as pkl
-import image_processing
-#import bag_of_words
+#import image_processing
+import bag_of_words
 
 
 #TODO: 
@@ -33,7 +36,9 @@ import image_processing
 
 
 def get_brand_index(trainDF,testDF):
-    
+    '''
+    converts brand names to indexes
+    '''
     def apply_brand_index(brand,brand_list):
         if brand in brand_list:
             return brand_list.index(brand)
@@ -43,6 +48,7 @@ def get_brand_index(trainDF,testDF):
     brands = list(trainDF.brand.unique())
     trainDF['brand_num']=trainDF.brand.apply(apply_brand_index,args=[brands])
     testDF['brand_num']=testDF.brand.apply(apply_brand_index,args=[brands])
+    return brands
 
 def shuffle_and_downsample(df,samples):
     '''
@@ -50,6 +56,7 @@ def shuffle_and_downsample(df,samples):
     args:
         samples: number of samples
     '''
+    #random seed 9 makes sure we always get the same shuffle.
     np.random.seed(9)
     assert df.shape[0]>2
     df = df.reindex(np.random.permutation(df.index)).copy()
@@ -82,28 +89,86 @@ def train_val_split(df,val_portion):
     assert valDF.shape[1]==trainDF.shape[1]
     return trainDF, valDF
 
-def X_y_split(df,y_label):
-    X=df.loc[:,'brand_num','description_clean','large_image_URL','cat_1','cat_2','cat_3','cat_1_num','cat_2_num','cat_3_num']
-    y=df.loc[:,y_label]
-    return X,y
+#Get text data
+def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
+    plog("Building text matrices...")
+    with open(tokenizer_path) as f:
+        tokenizer=pkl.load(f)
+    train_text_matrix_path=datadir + 'train_text.pkl'
+    val_text_matrix_path=datadir + 'val_text.pkl'
+    test_text_matrix_path=datadir + 'test_text.pkl'
 
-def merge_data(sets,csv_path,text_path, image_path):
+    bow_train, idx_train = bag_of_words.series_to_bag_of_words(trainDF.description_clean,tokenizer,train_text_matrix_path,mode="binary")
+    bow_val, idx_val = bag_of_words.series_to_bag_of_words(valDF.description_clean,tokenizer,val_text_matrix_path,mode="binary")
+    bow_test, idx_test = bag_of_words.series_to_bag_of_words(testDF.description_clean,tokenizer,test_text_matrix_path,mode="binary")
+
+    return (bow_train, bow_val, bow_test),(idx_train,idx_val,idx_test)
+
+def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
+    plog("Getting image matrices...")
+
+    def df2matrix(df):
+        return np.array([x[0,:] for x in df.iloc[:,0]]).astype(np.float32)
+
+    with open(train_imagepath,'rb') as f:
+        imageDF=pkl.load(f)
+
+    if test_imagepath is not None:
+        with open(test_imagepath,'rb') as f:
+            test_imageDF = pkl.load(f)
+
+        test_image_matrix = df2matrix(test_imageDF)
+        test_image_matrix = test_image_matrix[:testDF.shape[0]]
+        assert test_image_matrix.shape[0]==testDF.shape[0]
+    else: test_image=None
+
+
+
+    image_matrix = df2matrix(imageDF)
+    train_image_matrix = image_matrix[:trainDF.shape[0],:]
+    val_image_matrix = image_matrix[trainDF.shape[0]:trainDF.shape[0] + valDF.shape[0],:]
+
+    return (train_image_matrix, val_image_matrix, test_image)
+
+
+def X_y_split(df):
+    #X=df.loc[:,'brand_num','description_clean','large_image_URL','cat_1','cat_2','cat_3','cat_1_num','cat_2_num','cat_3_num']
+    X = df.loc[:,'brand_num'].values
+    X = np.reshape(X,(len(X),1))
+    y1 = df.loc[:,'cat_1_num'].values
+    y2 = df.loc[:,'cat_2_num'].values
+    y3 = df.loc[:,'cat_3_num'].values
+    return X,y1,y2,y3
+
+def conditional_hstack(other,bow,image,dataset):
+    if other is not None:
+        X=other
+        if bow is not None:
+            assert bow.shape[0]==X.shape[0]
+            X = np.hstack((X,bow))
+        else:
+            plog("Bag of words data missing from %s" %dataset)
+        if image is not None:
+            assert image.shape[0]==X.shape[0]
+            X = np.hstack((X,image))
+        else:
+            plog("Image data missing from %s" %dataset)
+    return X
+
+def merge_data(bows,images,others):
     '''
     merge together the datasets to be used in the model
     args:
         sets: list of datasets to be used
     '''
-    #TODO
+    #plog("Merging data...")
+    X_train = conditional_hstack(others[0],bows[0],images[0],'train')
+    X_val = conditional_hstack(others[1],bows[1],images[1],'val')
+    X_test = conditional_hstack(others[2],bows[2],images[2],'test')
+    return X_train,X_val,X_test
+    
 
-def main(datadir,
-        trainpath,
-        testpath,
-        train_samples,
-        test_samples,
-        val_portion,
-        y_label,
-        use_images,
-        use_text):
+def main():
     '''
     1. run train_val_split on training
     1b. run shuffle on test
@@ -114,57 +179,75 @@ def main(datadir,
         a. extract image data
     4. merge datasets
 
-    args:
-        train_df: training dataframe
-        test_df: test dataframe
-        use_images: boolean.  want to use image data?
-        use_text: boolean. want to use text data?
+    returns: X_train,y_train,X_val,y_val,X_test,y_test
     '''
-
-    trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
-    testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
-
-    testDF = shuffle_and_downsample(testDF,test_samples)
-    trainDF = shuffle_and_downsample(trainDF,train_samples)
-    trainDF,valDF = train_val_split(trainDF,val_portion)
-
-    return trainDF, valDF, testDF
-    #if use_images:    
-
-    #if use_text:
-
-
-    #X_trainDF = X_y_split(df,y_label)
-    #data = (X_train, y_train, X_val, y_val, X_test, y_test)
-    #return data
-
-if __name__ == '__main__':
     home = os.path.join(os.path.dirname(__file__),'..')
     #local datadir
-    #datadir = os.path.join(home,'data') + '/'
+    datadir = os.path.join(home,'data') + '/'
 
     #hpc datadir
-    datadir = '/scratch/cdg356/spring/data/'
+    #datadir = '/scratch/cdg356/spring/data/'
 
     trainpath = datadir + 'train_set.csv'
     testpath = datadir + 'test_set.csv'
-    train_samples=None
-    test_samples=100
+    train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+    train_samples=10000
+    test_samples=1000
     val_portion=0.1
     y_label='cat_1_num'
-    use_images=False
-    use_text=False
-    
-    trainDF, valDF, testDF = main(datadir,
-                                trainpath,
-                                testpath,
-                                train_samples,
-                                test_samples,
-                                val_portion,
-                                y_label,
-                                use_images,
-                                use_text)
+    use_images=True
+    use_text=True
 
+    plog("Loading train csv...")
+    trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
+    plog("Loading test csv...")
+    testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
+
+    brand_list = get_brand_index(trainDF,testDF)
+    with open(datadir + 'brand_list.pkl','wb') as f:
+        pkl.dump(brand_list,f)
+
+    trainDF = shuffle_and_downsample(trainDF,train_samples)
+    trainDF,valDF = train_val_split(trainDF,val_portion)
+    testDF = shuffle_and_downsample(testDF,test_samples)
+
+    #Load text data
+    t0 = datetime.now()
+    if use_text:
+        bow_data,idxs=build_text_matrices(datadir, 'tokenizer_5000.pkl', trainDF, valDF, testDF)
+        t1 = datetime.now()
+        plog("Time to load text: %s" %str(t1-t0))
+    else:
+        bow_data=None
+
+    #Load image data
+    t1 = datetime.now()
+    if use_images:
+        image_data = get_image_matrices(train_imagepath,None,trainDF, valDF, testDF)
+        t2 = datetime.now()
+        plog("Time to load images: %s" %str(t2-t1))
+    else:
+        image_data=None
+
+    #Load other data
+    other_train,y1_train,y2_train,y3_train=X_y_split(trainDF)
+    other_val,y1_val,y2_val,y3_val=X_y_split(valDF)
+    other_test,y1_test,y2_test,y3_test=X_y_split(testDF)
+    other_data = (other_train,other_val,other_test)
+
+    X_train,X_val,X_test = merge_data(bow_data,image_data,other_data)
+
+    train_data = X_train, y1_train, y2_train, y3_train
+    val_data = X_val, y1_val, y2_val, y3_val
+    test_data = X_test, y1_test, y2_test, y3_test
+    return train_data, val_data, test_data
+
+if __name__ == '__main__':
+    main()
+
+    
+
+'''
     dataset="train"
     iloc0=0
     iloc1=100000
@@ -180,3 +263,4 @@ if __name__ == '__main__':
                                 out_pickle_name,
                                 width=224,
                                 filetype='jpg')
+'''

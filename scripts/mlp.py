@@ -105,6 +105,10 @@ def get_data(
 
     return data, n_values
 
+def merge_data(**kwargs):
+
+    return 
+
 # ##################### Build the neural network model #######################
 # This script supports three types of models. For each one, we define a
 # function that takes a Theano variable representing the input and returns
@@ -394,7 +398,7 @@ def train_model(model='custom_mlp: ',
                     err, acc = val_fn(inputs, prev_inputs, target)
                 else:
                     err, acc = val_fn(inputs,target)
-                history_train_errs.append(err, acc)
+                history_train_errs.append([err, acc])
                 np.savez(save_path + saveto,
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
@@ -430,7 +434,7 @@ def train_model(model='custom_mlp: ',
                     err, acc = val_fn(inputs, prev_inputs, target)
                 else:
                     err, acc = val_fn(inputs, target)
-                history_train_errs.append(err, acc)
+                history_train_errs.append([err, acc])
                 print('saving...')
                 np.savez(save_path + saveto,
                         history_train_errs=history_train_errs,
@@ -534,10 +538,10 @@ def train_simple_model(model='custom_mlp',
 
     # Prepare Theano variables for inputs and target
     input_var = T.matrix('inputs',dtype='int64')
-    
+
     target_var = []
     for i in range(num_targets):
-        target_var.append(T.ivector('target_%s' % i))
+        target_var.append(T.vector('target_%s' % i,dtype = 'int64'))
 
     n_val_keys = n_values.keys()
 
@@ -567,7 +571,7 @@ def train_simple_model(model='custom_mlp',
     #for p,t in zip(prediction,target_var):
     #    loss += lasagne.objectives.categorical_crossentropy(p, t)
     
-    pred_concat = T.concatenate(prediction)  
+    pred_concat = T.concatenate(prediction, axis = 1)  
     target_concat = T.concatenate(target_var)
     loss = lasagne.objectives.categorical_crossentropy(pred_concat,target_concat)
     loss = loss.mean()
@@ -610,8 +614,7 @@ def train_simple_model(model='custom_mlp',
     train_fn = [] 
     val_fn = []
     for t,u,l,a in zip(target_var, updates, test_loss, test_acc):
-        pdb.set_trace()
-        train_fn.append(theano.function([pred_concat, target_concat], loss, updates=u))
+        train_fn.append(theano.function([input_var, target_concat], loss, updates=u))
         val_fn.append(theano.function([input_var, t], [l, a]))
 
     history_train_errs = []
@@ -630,12 +633,13 @@ def train_simple_model(model='custom_mlp',
             inputs = [[train[0][idx] for idx in batch],[train[1][idx] for idx in batch]]
             target = [[train[2][idx] for idx in batch],[train[3][idx] for idx in batch],
                         [train[4][idx] for idx in batch]]
+            target_concat = np.concatenate(tuple(target))
             #CG TODO: iterate over image vectors
             desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
             brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
             inputs = np.hstack((desc, brands)) #CG TODO: hstack with images as well
             for i in range(num_targets):
-                train_err[i] += train_fn[i](inputs, target[i])
+                train_err[i] += train_fn[i](inputs, target_concat)
             train_batches += 1
 
             params = get_all_params(network)
@@ -647,7 +651,7 @@ def train_simple_model(model='custom_mlp',
                     e, a = val_fn[i](inputs,target[i])
                     err.append(e)
                     acc.append(a)
-                history_train_errs.append(err, acc)
+                history_train_errs.append([err, acc])
                 np.savez(save_path + saveto,
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
@@ -681,7 +685,7 @@ def train_simple_model(model='custom_mlp',
                     e,a = val_fn[i](inputs, target[i])
                     err.append(e)
                     acc.append(a)
-                history_train_errs.append(err, acc)
+                history_train_errs.append([err, acc])
                 print('saving...')
                 np.savez(save_path + saveto,
                         history_train_errs=history_train_errs,
@@ -700,7 +704,7 @@ def train_simple_model(model='custom_mlp',
         print("  min training loss:\t\t{:.6f}".format(min_train))
         print("  max validation loss:\t\t{:.6f}".format(max_val))
         print("  min validation loss:\t\t{:.6f}".format(min_val))
-        print("  max validation accuracy:\t\t{:.2f} %".format(
+        print("  avg validation accuracy:\t\t{:.2f} %".format(
             avg_val_acc * 100))
 
 
@@ -735,11 +739,17 @@ def train_simple_model(model='custom_mlp',
     max_err = np.max(test_err / test_batches)
     min_err = np.min(test_err / test_batches)
     avg_acc = np.mean(test_acc / test_batches)
+    max_acc = np.max(test_acc / test_batches)
+    min_acc = np.min(test_acc / test_batches)
     print("Final results:")
     print("  max test loss:\t\t\t{:.6f}".format(max_err))
     print("  min test loss:\t\t\t{:.6f}".format(min_err))
     print("  avg test accuracy:\t\t{:.2f} %".format(
         avg_acc * 100))
+    print("  max test accuracy:\t\t{:.2f} %".format(
+        max_acc * 100))
+    print("  min test accuracy:\t\t{:.2f} %".format(
+        min_acc * 100))
 
     params = get_all_params(network)
     # Optionally, you could now dump the network weights to a file like this:
@@ -766,7 +776,7 @@ def main():
 
     #set variable values that will be used by all models
     desc_n_values = 5000
-    epochs = 5
+    epochs = 10
     depth = 10
     width = 256
     save_path = '../results/test_mlp/'
@@ -774,8 +784,8 @@ def main():
     # Load the dataset
     print("Loading data...")
     data, n_values = get_data(
-        test_size=100,  # If >0, we keep only this number of test example.
-        train_size = 2500, # If >0, we keep only this number of train example.
+        test_size=1000,  # If >0, we keep only this number of test example.
+        train_size = 10000, # If >0, we keep only this number of train example.
         valid_portion = 0.1,
         desc_n_values = desc_n_values)
 

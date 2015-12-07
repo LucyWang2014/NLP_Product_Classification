@@ -91,7 +91,7 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
 
     im = im - MEAN_IMAGE
     im=floatX(im[np.newaxis])
-    #get last layer from vgg model
+    #get last layer from vgg model.  This part takes ~1-4 seconds
     ll = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], im, deterministic=True).eval())
     return ll
 

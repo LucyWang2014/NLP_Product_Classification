@@ -21,7 +21,7 @@ def plog(msg):
     print msg
     log.info(msg)
 
-log.info('importing modules...')
+plog('importing modules...')
 import pandas as pd
 import numpy as np
 import pdb
@@ -140,19 +140,19 @@ def X_y_split(df):
     y3 = df.loc[:,'cat_3_num'].values
     return X,y1,y2,y3
 
-def conditional_hstack(other,bow,image,dataset):
+def conditional_hstack(other,bow,image,dataset_name):
     if other is not None:
         X=other
         if bow is not None:
             assert bow.shape[0]==X.shape[0]
             X = np.hstack((X,bow))
         else:
-            plog("Bag of words data missing from %s" %dataset)
+            plog("Bag of words data missing from %s" %dataset_name)
         if image is not None:
             assert image.shape[0]==X.shape[0]
             X = np.hstack((X,image))
         else:
-            plog("Image data missing from %s" %dataset)
+            plog("Image data missing from %s" %dataset_name)
     return X
 
 def merge_data(bows,images,others):
@@ -161,6 +161,12 @@ def merge_data(bows,images,others):
     args:
         sets: list of datasets to be used
     '''
+    #HACK: splitting None into 3
+    if bows is None:
+        bows = (None,None,None)
+    if images is None:
+        images= (None,None,None)
+
     #plog("Merging data...")
     X_train = conditional_hstack(others[0],bows[0],images[0],'train')
     X_val = conditional_hstack(others[1],bows[1],images[1],'val')
@@ -168,7 +174,12 @@ def merge_data(bows,images,others):
     return X_train,X_val,X_test
     
 
-def main():
+def main(datadir,
+        train_samples=10000,
+        test_samples=1000,
+        val_portion=0.1,
+        use_images=True,
+        use_text=True):
     '''
     1. run train_val_split on training
     1b. run shuffle on test
@@ -181,22 +192,10 @@ def main():
 
     returns: X_train,y_train,X_val,y_val,X_test,y_test
     '''
-    home = os.path.join(os.path.dirname(__file__),'..')
-    #local datadir
-    datadir = os.path.join(home,'data') + '/'
-
-    #hpc datadir
-    #datadir = '/scratch/cdg356/spring/data/'
 
     trainpath = datadir + 'train_set.csv'
     testpath = datadir + 'test_set.csv'
     train_imagepath = datadir + 'train_image_features_0_10000.pkl'
-    train_samples=10000
-    test_samples=1000
-    val_portion=0.1
-    y_label='cat_1_num'
-    use_images=True
-    use_text=True
 
     plog("Loading train csv...")
     trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
@@ -243,7 +242,18 @@ def main():
     return train_data, val_data, test_data
 
 if __name__ == '__main__':
-    main()
+    home = os.path.join(os.path.dirname(__file__),'..')
+    #local datadir
+    datadir = os.path.join(home,'data') + '/'
+
+    #hpc datadir
+    #datadir = '/scratch/cdg356/spring/data/'
+    train_data, val_data, test_data = data_prep.main(datadir,
+                                                train_samples=10000,
+                                                test_samples=1000,
+                                                val_portion=0.1,
+                                                use_images=True,
+                                                use_text=True)
 
     
 

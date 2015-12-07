@@ -175,6 +175,43 @@ def merge_data(bows,images,others):
     return X_train,X_val,X_test
     
 
+def prepDFs(datadir,
+        train_samples=10000,
+        test_samples=1000,
+        val_portion=0.1,
+        use_images=True,
+        use_text=True):
+    '''
+    1. run train_val_split on training
+    1b. run shuffle on test
+    2. if text:
+        a. train tokenizer
+        b. convert text data to bag of words matrix
+    3. if images:
+        a. extract image data
+    4. merge datasets
+
+    returns: X_train,y_train,X_val,y_val,X_test,y_test
+    '''
+
+    trainpath = datadir + 'train_set.csv'
+    testpath = datadir + 'test_set.csv'
+    train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+
+    plog("Loading train csv...")
+    trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
+    plog("Loading test csv...")
+    testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
+
+    brand_list = get_brand_index(trainDF,testDF)
+    with open(datadir + 'brand_list.pkl','wb') as f:
+        pkl.dump(brand_list,f)
+
+    trainDF = shuffle_and_downsample(trainDF,train_samples)
+    trainDF,valDF = train_val_split(trainDF,val_portion)
+    testDF = shuffle_and_downsample(testDF,test_samples)
+    return trainDF,valDF,testDF
+
 def main(datadir,
         train_samples=10000,
         test_samples=1000,
@@ -210,7 +247,6 @@ def main(datadir,
     trainDF = shuffle_and_downsample(trainDF,train_samples)
     trainDF,valDF = train_val_split(trainDF,val_portion)
     testDF = shuffle_and_downsample(testDF,test_samples)
-
     #Load text data
     t0 = datetime.now()
     if use_text:
@@ -245,11 +281,11 @@ def main(datadir,
 if __name__ == '__main__':
     home = os.path.join(os.path.dirname(__file__),'..')
     #local datadir
-    datadir = os.path.join(home,'data') + '/'
+    #datadir = os.path.join(home,'data') + '/'
 
     #hpc datadir
-    #datadir = '/scratch/cdg356/spring/data/'
-    train_data, val_data, test_data = data_prep.main(datadir,
+    datadir = '/scratch/cdg356/spring/data/'
+    trainDF,valDF,testDF = data_prep.prepDFs(datadir,
                                                 train_samples=10000,
                                                 test_samples=1000,
                                                 val_portion=0.1,
@@ -258,14 +294,14 @@ if __name__ == '__main__':
 
     
 
-'''
+    df=trainDF
     dataset="train"
-    iloc0=0
+    iloc0=30000
     iloc1=100000
-    save_freq=10000
-    out_pickle_name=dataset+'_image_features'
+    save_freq=1000
+    out_pickle_name=dataset+'_image_features/'+dataset+'_image_features'
 
-    image_processing.get_selected_image_features(trainDF,
+    image_processing.get_selected_image_features(df,
                                 datadir,
                                 dataset,
                                 iloc0,
@@ -274,4 +310,3 @@ if __name__ == '__main__':
                                 out_pickle_name,
                                 width=224,
                                 filetype='jpg')
-'''

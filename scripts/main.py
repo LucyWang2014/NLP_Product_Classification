@@ -26,10 +26,10 @@ import models
 
 home = os.path.join(os.path.dirname(__file__),'..')
 #local datadir
-datadir = os.path.join(home,'data') + '/'
+#datadir = os.path.join(home,'data') + '/'
 
 #hpc datadir
-#datadir = '/scratch/cdg356/spring/data/'
+datadir = '/scratch/cdg356/spring/data/'
 train_data, val_data, test_data = data_prep.main(datadir,
                                                 train_samples=1000,
                                                 test_samples=100,

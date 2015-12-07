@@ -23,6 +23,7 @@ def plog(msg):
 plog('importing modules...')
 import data_prep
 import models
+import pdb
 
 home = os.path.join(os.path.dirname(__file__),'..')
 #local datadir
@@ -42,6 +43,6 @@ X_val,y_val,_,_= val_data
 X_test,y_test,_,_ = test_data
 
 data_to_model = (X_train, y_train, X_val, y_val, X_test, y_test)
-
+pdb.set_trace()
 plog("Starting model...")
 models.main(data_to_model,model='mlp', num_epochs=10)

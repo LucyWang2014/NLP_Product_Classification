@@ -44,7 +44,7 @@ import data_prep
 # function that takes a Theano variable representing the input and returns
 # the output layer of a neural network model built in Lasagne.
 
-def build_mlp(input_var=None,shape=None):
+def build_mlp(input_var=None,n_cols=None):
     # This creates an MLP of two hidden layers of 800 units each, followed by
     # a softmax output layer of 10 units. It applies 20% dropout to the input
     # data and 50% dropout to the hidden layers.
@@ -52,7 +52,7 @@ def build_mlp(input_var=None,shape=None):
     # Input layer, specifying the expected input shape of the network
     # (unspecified batchsize, 1 channel, 28 rows and 28 columns) and
     # linking it to the given Theano variable `input_var`, if any:
-    l_in = lasagne.layers.InputLayer(shape=shape,
+    l_in = lasagne.layers.InputLayer(shape=(None,n_cols),
                                      input_var=input_var)
 
     # Apply 20% dropout to the input data:
@@ -193,6 +193,16 @@ def main(data, model='mlp', num_epochs=500):
     '''
     X_train, y_train, X_val, y_val, X_test, y_test = data
 
+    for x in data:
+        plog(x.shape)
+
+    X_train = X_train.astype(np.float32)
+    y_train = y_train.astype(np.int32)
+    X_val = X_val.astype(np.float32)
+    y_val = y_val.astype(np.int32)
+    X_test = X_test.astype(np.float32)
+    y_test = y_test.astype(np.int32)
+
     # Prepare Theano variables for inputs and targets
     input_var = T.matrix('inputs') #CG: matrix, not tensor4
     target_var = T.ivector('targets')
@@ -200,7 +210,7 @@ def main(data, model='mlp', num_epochs=500):
     # Create neural network model (depending on first command line parameter)
     print("Building model and compiling functions...")
     if model == 'mlp':
-        network = build_mlp(input_var,X_train.shape)
+        network = build_mlp(input_var,X_train.shape[1])
     elif model.startswith('custom_mlp:'):
         depth, width, drop_in, drop_hid = model.split(':', 1)[1].split(',')
         network = build_custom_mlp(input_var, int(depth), int(width),

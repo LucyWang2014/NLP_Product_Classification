@@ -102,6 +102,7 @@ def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
     bow_val, idx_val = bag_of_words.series_to_bag_of_words(valDF.description_clean,tokenizer,val_text_matrix_path,mode="binary")
     bow_test, idx_test = bag_of_words.series_to_bag_of_words(testDF.description_clean,tokenizer,test_text_matrix_path,mode="binary")
 
+    plog("bow_train type: %s" %type(bow_train))
     return (bow_train, bow_val, bow_test),(idx_train,idx_val,idx_test)
 
 def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):

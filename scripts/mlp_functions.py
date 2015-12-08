@@ -6,7 +6,7 @@ def one_hot_encode_features(data, n_values = None):
         n_values = max(data) + 1
     n_samples = len(data)
 
-    encoded_features = numpy.zeros((n_samples,n_values)).astype('int32')
+    encoded_features = numpy.zeros((n_samples,n_values)).astype('float32')
 
     for idx, seq in enumerate(data):
         if type(seq) == list:

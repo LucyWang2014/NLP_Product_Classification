@@ -18,9 +18,9 @@ import theano.tensor as T
 import lasagne
 
 from mlp_functions import one_hot_encode_features
+from utils import create_log, plog
 
 import pdb
-
 
 # ################## load the data ##################
 
@@ -285,16 +285,16 @@ def train_model(model='custom_mlp: ',
     layer_shape = desc_n_values + n_values['brands'] #CG TODO: add image dimensions here
 
     # Prepare Theano variables for inputs and target
-    input_var = T.matrix('inputs',dtype='int64')
+    input_var = T.matrix('inputs',dtype='float32')
     target_var = T.ivector('target')
 
     n_val_keys = n_values.keys()
     if cat != 1:
-        prev_cat_var = T.matrix('prev_inputs',dtype='int64')
+        prev_cat_var = T.matrix('prev_inputs',dtype='float32')
         classifier_layer_shape = width + n_values[n_val_keys[cat]]
-        train_prev_cat = train[cat]
-        valid_prev_cat = valid[cat]
-        test_prev_cat = prev_predictions
+        train_prev_cat = np.array(train[cat],dtype = 'float32')
+        valid_prev_cat = np.array(valid[cat], dtype = 'float32')
+        test_prev_cat = np.array(prev_predictions, dtype = 'float32')
 
     # Create neural network model (depending on first command line parameter)
     start_time = time.time()
@@ -333,8 +333,7 @@ def train_model(model='custom_mlp: ',
     # parameters at each training step. Here, we'll use adadelta,
     # but Lasagne offers plenty more.
     params = lasagne.layers.get_all_params(network, trainable=True)
-    updates = lasagne.updates.adadelta(
-            loss, params, learning_rate=0.01)
+    updates = lasagne.updates.adadelta(loss, params, learning_rate=0.01)
 
     # Create a loss expression for validation/testing. The crucial difference
     # here is that we do a deterministic forward pass through the network,
@@ -343,8 +342,6 @@ def train_model(model='custom_mlp: ',
     test_loss = lasagne.objectives.categorical_crossentropy(test_prediction,
                                                             target_var)
     test_loss = test_loss.mean()
-
-    #TODO: three target layers, loss is the sum of the three.  
 
     # As a bonus, also create an expression for the classification accuracy:
     # TODO: separate accuracy for the three
@@ -523,8 +520,8 @@ def train_simple_model(model='custom_mlp',
     desc_n_values = 5000,
     depth = 10,
     width = 256,
-    drop_in = 0.,
-    drop_hid = 0.,
+    drop_in = 0.2,
+    drop_hid = 0.5,
     batch_size = 32,
     learning_rate = 0.01,
     valid_freq = 100,
@@ -571,8 +568,6 @@ def train_simple_model(model='custom_mlp',
     #for p,t in zip(prediction,target_var):
     #    loss += lasagne.objectives.categorical_crossentropy(p, t)
     
-    pred_concat = T.concatenate(prediction, axis = 1)  
-    target_concat = T.concatenate(target_var)
     loss = lasagne.objectives.categorical_crossentropy(prediction[0],target_var[0]) + lasagne.objectives.categorical_crossentropy(prediction[1],target_var[1]) + lasagne.objectives.categorical_crossentropy(prediction[2],target_var[2])
     loss = loss.mean()
 
@@ -772,22 +767,23 @@ def main():
     '''
 
     #set variable values that will be used by all models
+
     desc_n_values = 5000
-    epochs = 5
-    depth = 10
+    epochs = 200
+    depth = 3
     width = 256
-    save_path = '../results/simple_mlp/'
+    save_path = '../results/dep_mlp/'
 
     # Load the dataset
     print("Loading data...")
     data, n_values = get_data(
-        test_size=100,  # If >0, we keep only this number of test example.
-        train_size = 1000, # If >0, we keep only this number of train example.
+        test_size=10000,  # If >0, we keep only this number of test example.
+        train_size = 50000, # If >0, we keep only this number of train example.
         valid_portion = 0.1,
         desc_n_values = desc_n_values)
 
     #create model
-    
+    '''
     params, preds = train_simple_model(model='custom_mlp', 
         data = data,
         n_values = n_values,
@@ -795,11 +791,11 @@ def main():
         desc_n_values = desc_n_values,
         depth = depth,
         width = width,
-        batch_size = 32,
+        batch_size = 128,
         learning_rate = 0.01,
-        valid_freq = 100,
+        valid_freq = 1000,
         save_path = save_path,
-        saveto = 'simple_mlp.npz',
+        saveto = 'simple_mlp_50000.npz',
         reload_model = None,
         num_targets = 3)
     
@@ -866,7 +862,6 @@ def main():
         prev_predictions = test_preds_2)
 
     np.savez(save_path + 'targets.pkl', data[2])
-    '''
 
 if __name__ == '__main__':
     if ('--help' in sys.argv) or ('-h' in sys.argv):

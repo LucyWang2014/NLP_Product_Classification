@@ -8,6 +8,7 @@ __author__='Charlie Guthrie'
 import pandas as pd
 from keras.preprocessing.text import Tokenizer
 import cPickle as pkl
+import numpy as np
 
 #TODO: is it a problem that the dictionary includes the validation set?
 
@@ -44,7 +45,7 @@ def series_to_bag_of_words(series,tokenizer,text_matrix_path,mode="binary"):
     #TODO: check if text matrix path exists?
     texts = series
     idx = series.index
-    text_matrix = tokenizer.texts_to_matrix(texts,mode)
+    text_matrix = tokenizer.texts_to_matrix(texts,mode).astype(np.float32)
     with open(text_matrix_path,'wb') as outf:
         pkl.dump(text_matrix,outf)
     #return pd.DataFrame(text_matrix, index=series.index)

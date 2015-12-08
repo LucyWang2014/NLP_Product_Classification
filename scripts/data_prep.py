@@ -21,7 +21,7 @@ def plog(msg):
     print msg
     log.info(msg)
 
-log.info('importing modules...')
+plog('importing modules...')
 import pandas as pd
 import numpy as np
 import pdb
@@ -102,6 +102,7 @@ def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
     bow_val, idx_val = bag_of_words.series_to_bag_of_words(valDF.description_clean,tokenizer,val_text_matrix_path,mode="binary")
     bow_test, idx_test = bag_of_words.series_to_bag_of_words(testDF.description_clean,tokenizer,test_text_matrix_path,mode="binary")
 
+    plog("bow_train type: %s" %type(bow_train))
     return (bow_train, bow_val, bow_test),(idx_train,idx_val,idx_test)
 
 def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
@@ -140,19 +141,19 @@ def X_y_split(df):
     y3 = df.loc[:,'cat_3_num'].values
     return X,y1,y2,y3
 
-def conditional_hstack(other,bow,image,dataset):
+def conditional_hstack(other,bow,image,dataset_name):
     if other is not None:
         X=other
         if bow is not None:
             assert bow.shape[0]==X.shape[0]
             X = np.hstack((X,bow))
         else:
-            plog("Bag of words data missing from %s" %dataset)
+            plog("Bag of words data missing from %s" %dataset_name)
         if image is not None:
             assert image.shape[0]==X.shape[0]
             X = np.hstack((X,image))
         else:
-            plog("Image data missing from %s" %dataset)
+            plog("Image data missing from %s" %dataset_name)
     return X
 
 def merge_data(bows,images,others):
@@ -161,6 +162,12 @@ def merge_data(bows,images,others):
     args:
         sets: list of datasets to be used
     '''
+    #HACK: splitting None into 3
+    if bows is None:
+        bows = (None,None,None)
+    if images is None:
+        images= (None,None,None)
+
     #plog("Merging data...")
     X_train = conditional_hstack(others[0],bows[0],images[0],'train')
     X_val = conditional_hstack(others[1],bows[1],images[1],'val')
@@ -168,7 +175,12 @@ def merge_data(bows,images,others):
     return X_train,X_val,X_test
     
 
-def main():
+def prepDFs(datadir,
+        train_samples=10000,
+        test_samples=1000,
+        val_portion=0.1,
+        use_images=True,
+        use_text=True):
     '''
     1. run train_val_split on training
     1b. run shuffle on test
@@ -181,22 +193,10 @@ def main():
 
     returns: X_train,y_train,X_val,y_val,X_test,y_test
     '''
-    home = os.path.join(os.path.dirname(__file__),'..')
-    #local datadir
-    datadir = os.path.join(home,'data') + '/'
-
-    #hpc datadir
-    #datadir = '/scratch/cdg356/spring/data/'
 
     trainpath = datadir + 'train_set.csv'
     testpath = datadir + 'test_set.csv'
     train_imagepath = datadir + 'train_image_features_0_10000.pkl'
-    train_samples=10000
-    test_samples=1000
-    val_portion=0.1
-    y_label='cat_1_num'
-    use_images=True
-    use_text=True
 
     plog("Loading train csv...")
     trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
@@ -210,7 +210,43 @@ def main():
     trainDF = shuffle_and_downsample(trainDF,train_samples)
     trainDF,valDF = train_val_split(trainDF,val_portion)
     testDF = shuffle_and_downsample(testDF,test_samples)
+    return trainDF,valDF,testDF
 
+def main(datadir,
+        train_samples=10000,
+        test_samples=1000,
+        val_portion=0.1,
+        use_images=True,
+        use_text=True):
+    '''
+    1. run train_val_split on training
+    1b. run shuffle on test
+    2. if text:
+        a. train tokenizer
+        b. convert text data to bag of words matrix
+    3. if images:
+        a. extract image data
+    4. merge datasets
+
+    returns: X_train,y_train,X_val,y_val,X_test,y_test
+    '''
+
+    trainpath = datadir + 'train_set.csv'
+    testpath = datadir + 'test_set.csv'
+    train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+
+    plog("Loading train csv...")
+    trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
+    plog("Loading test csv...")
+    testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
+
+    brand_list = get_brand_index(trainDF,testDF)
+    with open(datadir + 'brand_list.pkl','wb') as f:
+        pkl.dump(brand_list,f)
+
+    trainDF = shuffle_and_downsample(trainDF,train_samples)
+    trainDF,valDF = train_val_split(trainDF,val_portion)
+    testDF = shuffle_and_downsample(testDF,test_samples)
     #Load text data
     t0 = datetime.now()
     if use_text:
@@ -243,18 +279,29 @@ def main():
     return train_data, val_data, test_data
 
 if __name__ == '__main__':
-    main()
+    home = os.path.join(os.path.dirname(__file__),'..')
+    #local datadir
+    #datadir = os.path.join(home,'data') + '/'
+
+    #hpc datadir
+    datadir = '/scratch/cdg356/spring/data/'
+    trainDF,valDF,testDF = data_prep.prepDFs(datadir,
+                                                train_samples=10000,
+                                                test_samples=1000,
+                                                val_portion=0.1,
+                                                use_images=True,
+                                                use_text=True)
 
     
 
-'''
+    df=trainDF
     dataset="train"
-    iloc0=0
+    iloc0=30000
     iloc1=100000
-    save_freq=10000
-    out_pickle_name=dataset+'_image_features'
+    save_freq=1000
+    out_pickle_name=dataset+'_image_features/'+dataset+'_image_features'
 
-    image_processing.get_selected_image_features(trainDF,
+    image_processing.get_selected_image_features(df,
                                 datadir,
                                 dataset,
                                 iloc0,
@@ -263,4 +310,3 @@ if __name__ == '__main__':
                                 out_pickle_name,
                                 width=224,
                                 filetype='jpg')
-'''

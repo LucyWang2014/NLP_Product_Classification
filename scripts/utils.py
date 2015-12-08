@@ -20,3 +20,7 @@ def create_log(script_name):
 def plog(msg):
     print msg
     log.info(msg)
+
+def fplog(msg):
+    print(msg)
+    log.info(msg)

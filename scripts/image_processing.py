@@ -1,5 +1,9 @@
 # coding: utf-8
 
+#TODO: 
+#batch these up into batches of 256 or 512 images
+
+
 import numpy as np
 import pandas as pd
 import matplotlib

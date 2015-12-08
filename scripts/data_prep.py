@@ -5,23 +5,13 @@ Starting with the csv's, ending with X_train, y_train, X_val, y_val, X_test, y_t
 Where X's are feature vectors and y's are classifier integers
 '''
 __author__='Charlie Guthrie'
-#LOGGING BOILERPLATE
-from datetime import datetime
-start_time = datetime.now()
-import os
-#make log file if it doesn't exist
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-#logging boilerplate.  To log anything type log.info('stuff you want to log')
-import logging as log
-#log file with filename, HMS time
-log.basicConfig(filename='logs/%s%s.log' %(__file__.split('.')[0],start_time.strftime('_%Y%m%d_%H%M%S')),level=log.DEBUG)
 
-def plog(msg):
-    print msg
-    log.info(msg)
+from utils import create_log,plog
+create_log(__file__)
 
 plog('importing modules...')
+from datetime import datetime
+import os
 import pandas as pd
 import numpy as np
 import pdb
@@ -230,6 +220,23 @@ def main(datadir,
 
     returns: X_train,y_train,X_val,y_val,X_test,y_test
     '''
+    dstart=datetime.now()
+
+    plog("Checking to see if prepped data already available...")
+    outpath = datadir + 'model_data_%i_%i_%r_%s_%s.pkl'%(train_samples,test_samples,val_portion,use_images,use_text)
+    if os.path.exists(outpath):
+        plog("Data found.  Loading...")
+        pdb.set_trace()
+        with open(outpath,'rb') as f:
+            train_data, val_data, test_data = pkl.load(f)
+
+        dfin = datetime.now()
+        plog("Data loading time: %s" %(dfin-dstart))
+        return train_data, val_data, test_data
+
+    plog("Prepped data not available.  Preparing data...")
+
+
 
     trainpath = datadir + 'train_set.csv'
     testpath = datadir + 'test_set.csv'
@@ -276,7 +283,20 @@ def main(datadir,
     train_data = X_train, y1_train, y2_train, y3_train
     val_data = X_val, y1_val, y2_val, y3_val
     test_data = X_test, y1_test, y2_test, y3_test
-    return train_data, val_data, test_data
+
+    keys = ['X','y_1','y_2','y_3']
+    values = [max(train_data[k])+1 for k in keys]
+    n_values = collections.OrderedDict(zip(keys,values))
+    data = (train_data, val_data, test_data)
+
+    plog("Data loaded.  Saving to %s" %outpath)
+    with open(outpath,'wb') as f:
+        pkl.dump((data,n_values),f)
+
+    dfin = datetime.now()
+    plog("Data loading time: %s" %(dfin-dstart))
+
+    return data,n_values
 
 if __name__ == '__main__':
     home = os.path.join(os.path.dirname(__file__),'..')

@@ -2,7 +2,8 @@
 
 #TODO: 
 #batch these up into batches of 256 or 512 images
-
+from utils import create_log,plog
+create_log(__file__)
 
 import numpy as np
 import pandas as pd
@@ -13,12 +14,9 @@ import pdb
 import theano
 import cPickle as pkl
 import download_images_to_directory as dl
-import logging as log
 from datetime import datetime
-log.basicConfig(filename='../logs/image_processing.log',level=log.DEBUG)
 
-print "Theano device:",theano.config.device
-log.info("Theano device: %s" %theano.config.device)
+plog("Theano device:",theano.config.device)
 
 #dnn requires GPU
 import lasagne
@@ -30,8 +28,7 @@ from lasagne.utils import floatX
 
 # ### Load the model parameters and metadata
 def load_pretrained_model(datadir):
-    print "Loading vgg model..."
-    log.info ("Loading vgg model...")
+    plog("Loading vgg model...")
     model = pkl.load(open(datadir+'vgg_cnn_s.pkl'))
     #CLASSES = model['synset words']
     mean_image = model['mean image']
@@ -46,8 +43,7 @@ def build_image_network():
         network
     '''
 
-    print "Building lasagne net..."
-    log.info("Building lasagne net...")
+    plog("Building lasagne net...")
     net = {}
     net['input'] = InputLayer((None, 3, 224, 224))
     net['conv1'] = ConvLayer(net['input'], num_filters=96, filter_size=7, stride=2)
@@ -68,7 +64,11 @@ def build_image_network():
     lasagne.layers.set_all_param_values(output_layer, PRETRAINED_VGG['values'])
     return net
 
-def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
+def iterate_minibatches(series, batchsize):
+    for start_idx in range(0, series.shape[0] - batchsize + 1, batchsize):
+        yield series.iloc[start_idx:start_idx + batchsize]
+
+def prep_for_vgg(url,i,dataset,datadir,width=224,filetype="jpg"):
     '''
     Check to see image file has been downloaded at current size.  If it has not,
     download and resize image. Saves file to datadir/images/[dataset]_[idx]_w[width].[filetype]
@@ -83,9 +83,6 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
     returns:
         rawim: scaled and cropped image
     '''
-    if i%10000==0:
-        print "Extracting features from image index",i
-        log.info("Extracting features from image index %i" %i)
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
     # Shuffle axes to c01
     im = np.swapaxes(np.swapaxes(rawim, 1, 2), 0, 1)
@@ -95,9 +92,38 @@ def extract_image_features(url,i,dataset,datadir,width=224,filetype="jpg"):
 
     im = im - MEAN_IMAGE
     im=floatX(im[np.newaxis])
+    return im
+
+def batch_extract_features(batch_series,dataset,datadir,width,filetype):
+    '''
+    take batch_series and return dataframe of image features with shape (batchDF.shape[0],4096)
+    args:
+        batch_series:
+        dataset: "train" or "test"
+        datadir
+        width:224
+        filetype:jpg
+    returns:
+        featureDF: keeps original indexes, but has different column for each image feature
+    '''
+    image_urls = batch_series
+    indexes = batch_series.index
+    first=True
+    for i,url in image_urls.iteritems():
+        im = prep_for_vgg(url,i,dataset,datadir,width,filetype)
+        if first==True:
+            images = im
+            first=False
+        else:
+            images = np.vstack((images,im))
+    
+    #image_features = np.reshape(images,(images.shape[0],-1))
     #get last layer from vgg model.  This part takes ~1-4 seconds
-    ll = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], im, deterministic=True).eval())
-    return ll
+    image_features = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], images, deterministic=True).eval())
+    plog("image features shape" + str(image_features.shape))
+
+    featureDF = pd.DataFrame(image_features, index=[indexes]) 
+    return featureDF
 
 def get_selected_image_features(df,
                                 datadir,
@@ -106,6 +132,7 @@ def get_selected_image_features(df,
                                 iloc1,
                                 save_freq,
                                 out_pickle_name='image_features.pkl',
+                                batch_size=256,
                                 width=224,
                                 filetype='jpg'):
     '''
@@ -116,46 +143,43 @@ def get_selected_image_features(df,
         df: dataframe where image urls are
         iloc0: int or None. first iloc of range of images to download
         iloc1: int or None. last iloc of range of images to download
+        save_freq: how many batches before saving
+        out_pickle_name: name of outfile
+        batch_size: rows per batch
         dataset: string 'train' or 'test' or other identifier
 
     returns:
         none
     '''
+    assert iloc0<=df.shape[0]
+    assert iloc1<=df.shape[0]
     image_urls = df.large_image_URL.iloc[iloc0:iloc1]
-    featureDF = pd.DataFrame()
     iloc=iloc0
     prev_iloc = iloc0
-    #iterate through index and url
-    for i,url in image_urls.iteritems():
-        if iloc%(save_freq/100)==0:
-            print "extracting image feature iloc %i, index %i" %(iloc,i)
-            log.info("extracting image feature iloc %i, index %i" %(iloc,i))
-        image_feature = extract_image_features(url,i,dataset,datadir,width,filetype)
-        new_row = pd.DataFrame(None, columns=['image_feature'],index=[i])
-        #new_row = pd.DataFrame(url, columns=['image_feature'],index=[i])
+    batch_num=0
+    featureDF = pd.DataFrame()
+    
+    for batch in iterate_minibatches(image_urls,batch_size):
+        if batch_num%(save_freq/10)==0:
+            plog("extracting image features for batch %i, iloc %i" %(batch_num,iloc))
+        batch_featureDF = batch_extract_features(batch,dataset,datadir,width,filetype)
+        featureDF=featureDF.append(batch_featureDF,verify_integrity=True)
         
-        try:
-            featureDF=featureDF.append(new_row,verify_integrity=True)
-            featureDF.loc[i,'image_feature']=image_feature.astype(object)
-        except:
-            print "index %i already exists" %i
-            log.info("index %i already exists" %i)
-        if iloc>iloc0 and (iloc%save_freq==0 or iloc==iloc1-1):
-            print "Saving from image iloc %i to image iloc %i" %(prev_iloc,iloc)
-            log.info("Saving from image iloc %i to image iloc %i" %(prev_iloc,iloc))
+        iloc+=batch_size
+        batch_num+=1
+        
+        if iloc>iloc0 and (batch_num%save_freq==0 or iloc>=iloc1-1):
+            plog("Saving from image iloc %i to image iloc %i" %(prev_iloc,iloc))
             with open(datadir+out_pickle_name + '_' + str(prev_iloc) + '_' + str(iloc)+'.pkl','wb') as outf:
                 pkl.dump(featureDF,outf)  
             prev_iloc = iloc
 
             #reset featureDF to save memory
             featureDF = pd.DataFrame()
-        iloc+=1
 
 
-    #with open('image_feature_test.csv','wb') as outf:
-    #    featureDF.to_csv(outf, header=True, index=True)
 
-DATADIR = "/scratch/cdg356/spring/data/"
+DATADIR = "../data/"
 PRETRAINED_VGG, MEAN_IMAGE = load_pretrained_model(DATADIR)
 IMAGE_NET = build_image_network()
 
@@ -172,5 +196,4 @@ if __name__ == '__main__':
 
     end_time = datetime.now()
     runtime = end_time - start_time
-    print "script runtime: ",runtime
-    log.info("script runtime: "+str(runtime))
+    plog("script runtime: "+str(runtime))

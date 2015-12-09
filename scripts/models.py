@@ -32,8 +32,8 @@ def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=np.float32(
     '''
     args:
         layer_shape: width of input X
-        drop_input:
-        drop_hidden:
+        drop_input: fraction to dropout from input layer
+        drop_hidden: fraction to dropout from hidden layers
         num_units: List or int. 19, 40, or 240ish, or [19,40,240ish].  number of choices in each category.  
         input_var: input variable.  matrix
     '''

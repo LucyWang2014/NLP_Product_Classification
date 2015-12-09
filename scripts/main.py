@@ -25,7 +25,7 @@ data,n_values = data_prep.main(datadir,
                                 val_portion=0.1,
                                 use_images=True,
                                 use_text=False,
-                                debug=True)
+                                debug=False)
 
 plog("Starting model...")
 

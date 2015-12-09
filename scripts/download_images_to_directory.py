@@ -42,7 +42,7 @@ def download_and_resize(url,width):
     rawim = im.astype('uint8')
     return rawim
 
-def prep_image(url,idx,dataset,datadir,width=224,filetype='jpg'):
+def prep_image(url,idx,dataset,datadir,width=224,filetype='jpg',verbose=False):
     '''
     Check to see image file has been downloaded at current size.  If it has not,
     download and resize image. Saves file to datadir/images/[dataset]_[idx]_w[width].[filetype]
@@ -60,7 +60,8 @@ def prep_image(url,idx,dataset,datadir,width=224,filetype='jpg'):
     outpath = datadir + 'images/' + dataset + '_' +  str(idx) + '_w' + str(width) + '.' + filetype
 
     if not os.path.isfile(outpath):
-        print "downloading image #%s..." %str(idx)
+        if verbose:
+            print "downloading image #%s..." %str(idx)
         try:
             rawim = download_and_resize(url,width)
             plt.imsave(outpath,rawim)
@@ -68,7 +69,8 @@ def prep_image(url,idx,dataset,datadir,width=224,filetype='jpg'):
         except:
             print "unable to download"
     else:
-        print "Image %i already downloaded. Loading from file..." % idx
+        if verbose:
+            print "Image %i already downloaded. Loading from file..." % idx
         rawim = plt.imread(outpath)
         return rawim
         

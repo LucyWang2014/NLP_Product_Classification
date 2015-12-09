@@ -16,7 +16,7 @@ import cPickle as pkl
 import download_images_to_directory as dl
 from datetime import datetime
 
-plog("Theano device:",theano.config.device)
+plog("Theano device: %s" %theano.config.device)
 
 #dnn requires GPU
 import lasagne
@@ -120,7 +120,6 @@ def batch_extract_features(batch_series,dataset,datadir,width,filetype):
     #image_features = np.reshape(images,(images.shape[0],-1))
     #get last layer from vgg model.  This part takes ~1-4 seconds
     image_features = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], images, deterministic=True).eval())
-    plog("image features shape" + str(image_features.shape))
 
     featureDF = pd.DataFrame(image_features, index=[indexes]) 
     return featureDF
@@ -160,8 +159,7 @@ def get_selected_image_features(df,
     featureDF = pd.DataFrame()
     
     for batch in iterate_minibatches(image_urls,batch_size):
-        if batch_num%(save_freq/10)==0:
-            plog("extracting image features for batch %i, iloc %i" %(batch_num,iloc))
+        plog("extracting image features for batch %i, iloc %i" %(batch_num,iloc))
         batch_featureDF = batch_extract_features(batch,dataset,datadir,width,filetype)
         featureDF=featureDF.append(batch_featureDF,verify_integrity=True)
         

@@ -324,7 +324,7 @@ if __name__ == '__main__':
 
     #hpc datadir
     datadir = '/scratch/cdg356/spring/data/'
-    trainDF,valDF,testDF = data_prep.prepDFs(datadir,
+    trainDF,valDF,testDF = prepDFs(datadir,
                                                 train_samples=None,
                                                 test_samples=None,
                                                 val_portion=0.1,
@@ -335,10 +335,10 @@ if __name__ == '__main__':
     df=trainDF
     dataset="train"
     iloc0=0
-    iloc1=2000
-    save_freq=2
-    batch_size = 256
-    out_pickle_name=dataset+'_image_features/'+dataset+'fake_image_features'
+    iloc1=10000
+    save_freq=10
+    batch_size = 250
+    out_pickle_name=dataset+'_image_features/'+dataset+'_image_features'
 
     image_processing.get_selected_image_features(df,
                                 datadir,

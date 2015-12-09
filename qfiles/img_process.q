@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #PBS -l nodes=1:ppn=2:gpus=1
-#PBS -l walltime=80:00:00
-#PBS -l mem=12GB
-#PBS -N img_process_30k_100k
+#PBS -l walltime=10:00:00
+#PBS -l mem=23GB
+#PBS -N test_img_process_0_10k
 #PBS -j oe
 
 THEANO_FLAGS='floatX=float32,device=gpu,cuda.root=/share/apps/cuda/6.5.12'
@@ -13,7 +13,7 @@ fi
 
 export THEANO_FLAGS
 
-cd /home/cdg356/spring/scripts
+cd /scratch/cdg356/spring/scripts
 
 module purge
 module load pillow/intel/2.7.0

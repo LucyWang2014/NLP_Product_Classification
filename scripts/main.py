@@ -14,16 +14,13 @@ import models
 import pdb
 
 home = os.path.join(os.path.dirname(__file__),'..')
-#local datadir
 datadir = os.path.join(home,'data') + '/'
 
-#hpc datadir
-#datadir = '/scratch/cdg356/spring/data/'
 data,n_values = data_prep.main(datadir,
-                                train_samples=10000,
-                                test_samples=1000,
+                                train_samples=67000,
+                                test_samples=10000,
                                 val_portion=0.1,
-                                use_images=True,
+                                use_images=False,
                                 use_text=False,
                                 debug=False)
 
@@ -34,7 +31,7 @@ params, preds = models.train_simple_model(data = data,
         num_epochs=5,
         depth = 10,
         width = 256,
-        batch_size = 32,
+        batch_size = 256,
         learning_rate = 0.01,
         valid_freq = 100,
         save_path = '../results/simple_mlp/',

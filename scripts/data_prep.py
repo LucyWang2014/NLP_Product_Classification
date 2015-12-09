@@ -123,13 +123,18 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
 
 
 def X_y_split(df):
+    '''
+    Split data frame into matrices of X and y variables, then output as float32/int32
+    '''
     #X=df.loc[:,'brand_num','description_clean','large_image_URL','cat_1','cat_2','cat_3','cat_1_num','cat_2_num','cat_3_num']
     X = df.loc[:,'brand_num'].values
-    X = np.reshape(X,(len(X),1))
-    y1 = df.loc[:,'cat_1_num'].values
-    y2 = df.loc[:,'cat_2_num'].values
-    y3 = df.loc[:,'cat_3_num'].values
+    X = np.reshape(X,(len(X),1)).astype(np.float32)
+    y1 = df.loc[:,'cat_1_num'].values.astype(np.int32)
+    y2 = df.loc[:,'cat_2_num'].values.astype(np.int32)
+    y3 = df.loc[:,'cat_3_num'].values.astype(np.int32)
     return X,y1,y2,y3
+
+
 
 def conditional_hstack(other,bow,image,dataset_name):
     if other is not None:
@@ -151,6 +156,7 @@ def merge_data(bows,images,others):
     merge together the datasets to be used in the model
     args:
         sets: list of datasets to be used
+    returns: 2D float32 numpyarrays
     '''
     #HACK: splitting None into 3
     if bows is None:
@@ -162,7 +168,8 @@ def merge_data(bows,images,others):
     X_train = conditional_hstack(others[0],bows[0],images[0],'train')
     X_val = conditional_hstack(others[1],bows[1],images[1],'val')
     X_test = conditional_hstack(others[2],bows[2],images[2],'test')
-    return X_train,X_val,X_test
+
+    return X_train.astype(np.float32), X_val.astype(np.float32), X_test.astype(np.float32)
     
 
 def prepDFs(datadir,
@@ -207,7 +214,8 @@ def main(datadir,
         test_samples=1000,
         val_portion=0.1,
         use_images=True,
-        use_text=True):
+        use_text=True,
+        debug=False):
     '''
     1. run train_val_split on training
     1b. run shuffle on test
@@ -220,27 +228,33 @@ def main(datadir,
 
     returns: X_train,y_train,X_val,y_val,X_test,y_test
     '''
-    dstart=datetime.now()
 
+
+    if(debug):
+        trainpath = datadir + 'head_train_set.csv'
+        testpath = datadir + 'head_test_set.csv'
+        train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+        train_samples = 90
+        test_samples = 90
+    else:
+        trainpath = datadir + 'train_set.csv'
+        testpath = datadir + 'test_set.csv'
+        train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+
+    dstart=datetime.now()
     plog("Checking to see if prepped data already available...")
     outpath = datadir + 'model_data_%i_%i_%r_%s_%s.pkl'%(train_samples,test_samples,val_portion,use_images,use_text)
     if os.path.exists(outpath):
         plog("Data found.  Loading...")
-        pdb.set_trace()
         with open(outpath,'rb') as f:
-            train_data, val_data, test_data = pkl.load(f)
+            data,n_values = pkl.load(f)
 
         dfin = datetime.now()
         plog("Data loading time: %s" %(dfin-dstart))
-        return train_data, val_data, test_data
+        return data,n_values
 
     plog("Prepped data not available.  Preparing data...")
 
-
-
-    trainpath = datadir + 'train_set.csv'
-    testpath = datadir + 'test_set.csv'
-    train_imagepath = datadir + 'train_image_features_0_10000.pkl'
 
     plog("Loading train csv...")
     trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
@@ -284,9 +298,9 @@ def main(datadir,
     val_data = X_val, y1_val, y2_val, y3_val
     test_data = X_test, y1_test, y2_test, y3_test
 
-    keys = ['X','y_1','y_2','y_3']
-    values = [max(train_data[k])+1 for k in keys]
-    n_values = collections.OrderedDict(zip(keys,values))
+    keys = ['y_1','y_2','y_3']
+    values = [max(d)+1 for d in train_data[1:]]
+    n_values = dict(zip(keys,values))
     data = (train_data, val_data, test_data)
 
     plog("Data loaded.  Saving to %s" %outpath)
@@ -310,7 +324,8 @@ if __name__ == '__main__':
                                                 test_samples=1000,
                                                 val_portion=0.1,
                                                 use_images=True,
-                                                use_text=True)
+                                                use_text=True,
+                                                debug=False)
 
     
 

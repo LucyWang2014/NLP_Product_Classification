@@ -9,6 +9,7 @@ Adapted from the MNIST example codes in Lasagne
 
 
 from __future__ import print_function
+from utils import create_log,plog,fplog
 
 import sys
 import os
@@ -61,7 +62,7 @@ def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=np.float32(
     softmax = lasagne.nonlinearities.softmax
     if type(num_units) == list:
         networks = []
-        for idx, num_unit in enumerate(num_units):
+        for num_unit in num_units:
             networks.append(lasagne.layers.DenseLayer(network, num_unit[0], nonlinearity=softmax))
     else:
         networks = lasagne.layers.DenseLayer(network, num_units, nonlinearity=softmax)
@@ -114,7 +115,7 @@ def train_simple_model(data = None,
     save_path = '../results/',
     saveto = 'test_mlp.npz',
     reload_model = None,
-    num_targets = 1):
+    num_targets = 3):
 
     train, valid, test = data
 
@@ -127,7 +128,7 @@ def train_simple_model(data = None,
     #CG: num_targets is 1 or 3.  int64 fine because it goes into output
     target_var = []
     for i in range(num_targets):
-        target_var.append(T.vector('target_%s' % i,dtype = 'int64'))
+        target_var.append(T.vector('target_%s' % i,dtype = 'int32'))
 
     # Create neural network model (depending on first command line parameter)
     #CG: ignore mlp, maybe remove this whole switch.
@@ -146,22 +147,17 @@ def train_simple_model(data = None,
     for n in network:
         prediction.append(lasagne.layers.get_output(n))
 
+    loss=0
+
     #for p,t in zip(prediction,target_var):
     #    loss += lasagne.objectives.categorical_crossentropy(p, t)
-    
-    #CG 3: Calculate loss from prediction
-    pred_concat = T.concatenate(prediction, axis = 1)  
-    target_concat = T.concatenate(target_var)
     loss = lasagne.objectives.categorical_crossentropy(prediction[0],target_var[0]) + lasagne.objectives.categorical_crossentropy(prediction[1],target_var[1]) + lasagne.objectives.categorical_crossentropy(prediction[2],target_var[2])
-    loss = loss.mean()
+    loss=loss.mean()
 
 
-    # We could add some weight decay as well here, see lasagne.regularization.
 
     # Create update expressions for training, i.e., how to modify the
     # parameters at each training step. Here, we'll use adadelta,
-
-    #
     params = []
     for i, n in enumerate(network):
         if i == 0:
@@ -194,7 +190,6 @@ def train_simple_model(data = None,
 
   
     val_fn = []
-
     train_fn = theano.function([input_var] + target_var, loss, updates=updates)
     for t,l,a in zip(target_var, test_loss, test_acc):
         val_fn.append(theano.function([input_var, t], [l, a]))
@@ -212,14 +207,14 @@ def train_simple_model(data = None,
 
         for batch in iterate_minibatches(train, batch_size, shuffle=False):
             inputs, targets = batch
-            train_err += train_fn(inputs, targets)
+            train_err += train_fn(inputs, targets[0], targets[1], targets[2])
             train_batches += 1
 
             if train_batches % valid_freq == 0:
                 err = []
                 acc = []
                 for i in range(num_targets):
-                    e, a = val_fn[i](inputs,target[i])
+                    e, a = val_fn[i](inputs,targets[i])
                     err.append(e)
                     acc.append(a)
                 history_train_errs.append([err, acc])
@@ -238,18 +233,18 @@ def train_simple_model(data = None,
 
             #calculate error and accuracy separately for each target
             for i in range(num_targets):
-                e,a = val_fn[i](inputs, target[i])
+                e,a = val_fn[i](inputs, targets[i])
                 val_err[i] += e
                 val_acc[i] += a
             val_batches += 1
 
             params = get_all_params(network)
 
-            if t_idx % valid_freq == 0:
+            if train_batches % valid_freq == 0:
                 err = []
                 acc = []
                 for i in range(num_targets):
-                    e,a = val_fn[i](inputs, target[i])
+                    e,a = val_fn[i](inputs, targets[i])
                     err.append(e)
                     acc.append(a)
                 history_train_errs.append([err, acc])
@@ -284,16 +279,17 @@ def train_simple_model(data = None,
     test_acc = np.zeros(num_targets)
     test_batches = 0
     test_preds = []
+    y_test_list = test[1:]
     for i in range(num_targets):
-        test_preds.append(np.zeros(len(test[i+2])))
+        test_preds.append(np.zeros(len(y_test_list[i])))
     for batch in iterate_minibatches(train, batch_size, shuffle=False):
         inputs, targets = batch
         
         for i in range(num_targets):
-            e,a = val_fn[i](inputs, target[i])
+            e,a = val_fn[i](inputs, targets[i])
             pred_prob = preds[i](inputs)
             pred = pred_prob.argmax(axis = 1)
-            test_preds[i][batch[0]:batch[-1]+1] = pred
+            test_preds[i] = np.append(test_preds[i],pred)
             test_err[i] += e
             test_acc[i] += a
         test_batches += 1
@@ -314,7 +310,11 @@ def train_simple_model(data = None,
         min_acc * 100))
 
     params = get_all_params(network)
+
+
     # Optionally, you could now dump the network weights to a file like this:
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
     np.savez(save_path + saveto,train_err=train_err / train_batches,
                         valid_err=val_err / val_batches, 
                         test_err=test_err / test_batches,

@@ -282,7 +282,7 @@ def train_simple_model(data = None,
     test_acc = np.zeros(num_targets)
     test_batches = 0
     test_preds = []
-    y_test_list = test[1:]
+    y_test_list = test[1:]  #omit X_test.  Only want y1,y2,y3
     for i in range(num_targets):
         test_preds.append(np.zeros(len(y_test_list[i])))
     for batch in iterate_minibatches(train, batch_size, shuffle=False):
@@ -297,6 +297,8 @@ def train_simple_model(data = None,
             test_acc[i] += a
         test_batches += 1
 
+    test_acc_pct = []
+
     max_err = np.max(test_err / test_batches)
     min_err = np.min(test_err / test_batches)
     avg_acc = np.mean(test_acc / test_batches)
@@ -305,12 +307,14 @@ def train_simple_model(data = None,
     fplog("Final results:")
     fplog("  max test loss:\t\t\t{:.6f}".format(max_err))
     fplog("  min test loss:\t\t\t{:.6f}".format(min_err))
-    fplog("  avg test accuracy:\t\t{:.2f} %".format(
+
+    #calculate test accuracy
+    for i in range(len(test_acc)):
+        test_acc_pct.append(test_acc[i]/ test_batches)
+        fplog("  test accuracy "+str(i)+":\t\t{:.2f} %".format(
+            test_acc_pct[i] * 100))
+    fplog(" mean test accuracy:\t\t{:.2f} %".format(
         avg_acc * 100))
-    fplog("  max test accuracy:\t\t{:.2f} %".format(
-        max_acc * 100))
-    fplog("  min test accuracy:\t\t{:.2f} %".format(
-        min_acc * 100))
 
     params = get_all_params(network)
 
@@ -319,6 +323,7 @@ def train_simple_model(data = None,
     np.savez(save_path, train_err=train_err / train_batches,
                         valid_err=val_err / val_batches, 
                         test_err=test_err / test_batches,
+                        test_acc = test_acc_pct
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
                         predictions = test_preds,

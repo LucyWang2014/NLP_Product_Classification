@@ -104,6 +104,7 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
     with open(train_imagepath,'rb') as f:
         imageDF=pkl.load(f)
     
+    plog("Loading test image features from %s..." %test_imagepath)
     if test_imagepath is not None:
         plog("Loading test image features from %s..." %test_imagepath)
         with open(test_imagepath,'rb') as f:

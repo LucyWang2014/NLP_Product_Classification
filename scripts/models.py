@@ -197,7 +197,7 @@ def train_simple_model(data = None,
     history_train_errs = []
     history_valid_errs = []
     # Finally, launch the training loop.
-    print("Starting training...")
+    fplog("Starting training...")
     # We iterate over epochs:
     for epoch in range(num_epochs):
         # In each epoch, we do a full pass over the training data:
@@ -250,34 +250,34 @@ def train_simple_model(data = None,
                     err.append(e)
                     acc.append(a)
                 history_train_errs.append([err, acc])
-                print('saving...')
+                fplog('saving...')
                 np.savez(save_path,
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
                         options_dict=options_dict,
                          *params)
 
-        # Then we print the results for this epoch:
-        print("Epoch {} of {} took {:.3f}s".format(
+        # Then we fplog the results for this epoch:
+        fplog("Epoch {} of {} took {:.3f}s".format(
             epoch + 1, num_epochs, time.time() - start_time))
         max_train = np.max(train_err / train_batches)
         min_train = np.min(train_err / train_batches)
         max_val = np.max(val_err / val_batches)
         min_val = np.min(val_err / val_batches)
         avg_val_acc = np.mean(val_acc / val_batches)
-        print("  max training loss:\t\t{:.6f}".format(max_train))
-        print("  min training loss:\t\t{:.6f}".format(min_train))
-        print("  max validation loss:\t\t{:.6f}".format(max_val))
-        print("  min validation loss:\t\t{:.6f}".format(min_val))
-        print("  avg validation accuracy:\t\t{:.2f} %".format(
+        fplog("  max training loss:\t\t{:.6f}".format(max_train))
+        fplog("  min training loss:\t\t{:.6f}".format(min_train))
+        fplog("  max validation loss:\t\t{:.6f}".format(max_val))
+        fplog("  min validation loss:\t\t{:.6f}".format(min_val))
+        fplog("  avg validation accuracy:\t\t{:.2f} %".format(
             avg_val_acc * 100))
 
 
     end_time = time.time()
-    print("The code ran for %d epochs, with %f sec/epochs" % (
+    fplog("The code ran for %d epochs, with %f sec/epochs" % (
         (num_epochs), (end_time - start_time) / (1. * (num_epochs))))
 
-    # After training, we compute and print the test error:
+    # After training, we compute and fplog the test error:
     test_err = np.zeros(num_targets)
     test_acc = np.zeros(num_targets)
     test_batches = 0
@@ -302,14 +302,14 @@ def train_simple_model(data = None,
     avg_acc = np.mean(test_acc / test_batches)
     max_acc = np.max(test_acc / test_batches)
     min_acc = np.min(test_acc / test_batches)
-    print("Final results:")
-    print("  max test loss:\t\t\t{:.6f}".format(max_err))
-    print("  min test loss:\t\t\t{:.6f}".format(min_err))
-    print("  avg test accuracy:\t\t{:.2f} %".format(
+    fplog("Final results:")
+    fplog("  max test loss:\t\t\t{:.6f}".format(max_err))
+    fplog("  min test loss:\t\t\t{:.6f}".format(min_err))
+    fplog("  avg test accuracy:\t\t{:.2f} %".format(
         avg_acc * 100))
-    print("  max test accuracy:\t\t{:.2f} %".format(
+    fplog("  max test accuracy:\t\t{:.2f} %".format(
         max_acc * 100))
-    print("  min test accuracy:\t\t{:.2f} %".format(
+    fplog("  min test accuracy:\t\t{:.2f} %".format(
         min_acc * 100))
 
     params = get_all_params(network)
@@ -353,15 +353,15 @@ def main(data,n_values):
 
 if __name__ == '__main__':
     if ('--help' in sys.argv) or ('-h' in sys.argv):
-        print("Trains a neural network on MNIST using Lasagne.")
-        print("Usage: %s [MODEL [EPOCHS]]" % sys.argv[0])
-        print()
-        print("MODEL: 'mlp' for a simple Multi-Layer Perceptron (MLP),")
-        print("       'custom_mlp:DEPTH,WIDTH,DROP_IN,DROP_HID' for an MLP")
-        print("       with DEPTH hidden layers of WIDTH units, DROP_IN")
-        print("       input dropout and DROP_HID hidden dropout,")
-        print("       'cnn' for a simple Convolutional Neural Network (CNN).")
-        print("EPOCHS: number of training epochs to perform (default: 500)")
+        fplog("Trains a neural network on MNIST using Lasagne.")
+        fplog("Usage: %s [MODEL [EPOCHS]]" % sys.argv[0])
+        fplog()
+        fplog("MODEL: 'mlp' for a simple Multi-Layer Perceptron (MLP),")
+        fplog("       'custom_mlp:DEPTH,WIDTH,DROP_IN,DROP_HID' for an MLP")
+        fplog("       with DEPTH hidden layers of WIDTH units, DROP_IN")
+        fplog("       input dropout and DROP_HID hidden dropout,")
+        fplog("       'cnn' for a simple Convolutional Neural Network (CNN).")
+        fplog("EPOCHS: number of training epochs to perform (default: 500)")
     else:
         kwargs = {}
         if len(sys.argv) > 1:

@@ -9,7 +9,7 @@ Adapted from the MNIST example codes in Lasagne
 
 
 from __future__ import print_function
-from utils import create_log,plog,fplog,save_to_result_file
+from utils import create_log,plog,fplog
 
 import sys
 import os
@@ -347,7 +347,7 @@ def main(data,n_values):
         learning_rate = 0.01,
         valid_freq = 100,
         save_path = '../results/simple_mlp/',
-        options_dict = None
+        options_dict = None,
         reload_model = None,
         num_targets = 3)
 

@@ -96,30 +96,29 @@ def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
     return (bow_train, bow_val, bow_test),(idx_train,idx_val,idx_test)
 
 def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
-    plog("Getting image matrices...")
+    '''
+    load images from pkl files and convert to matrices
+    '''
 
-    def df2matrix(df):
-        return np.array([x[0,:] for x in df.iloc[:,0]]).astype(np.float32)
-
+    plog("Loading train image features from %s..." %train_imagepath)
     with open(train_imagepath,'rb') as f:
         imageDF=pkl.load(f)
-
+    
     if test_imagepath is not None:
+        plog("Loading test image features from %s..." %test_imagepath)
         with open(test_imagepath,'rb') as f:
             test_imageDF = pkl.load(f)
 
-        test_image_matrix = df2matrix(test_imageDF)
-        test_image_matrix = test_image_matrix[:testDF.shape[0]]
+        test_image_matrix = test_imageDF.as_matrix()
+        test_image_matrix = test_image_matrix[:testDF.shape[0],:]
         assert test_image_matrix.shape[0]==testDF.shape[0]
-    else: test_image=None
+    else: test_image_matrix=None
 
-
-
-    image_matrix = df2matrix(imageDF)
+    image_matrix = imageDF.as_matrix()
     train_image_matrix = image_matrix[:trainDF.shape[0],:]
     val_image_matrix = image_matrix[trainDF.shape[0]:trainDF.shape[0] + valDF.shape[0],:]
 
-    return (train_image_matrix, val_image_matrix, test_image)
+    return (train_image_matrix, val_image_matrix, test_image_matrix)
 
 
 def X_y_split(df):
@@ -137,6 +136,11 @@ def X_y_split(df):
 
 
 def conditional_hstack(other,bow,image,dataset_name):
+    '''
+    assumes other is present.
+    if bag of words is not none, hstack it
+    if image is not None, hstack it
+    '''
     if other is not None:
         X=other
         if bow is not None:
@@ -164,7 +168,7 @@ def merge_data(bows,images,others):
     if images is None:
         images= (None,None,None)
 
-    #plog("Merging data...")
+    plog("Merging data...")
     X_train = conditional_hstack(others[0],bows[0],images[0],'train')
     X_val = conditional_hstack(others[1],bows[1],images[1],'val')
     X_test = conditional_hstack(others[2],bows[2],images[2],'test')
@@ -216,9 +220,12 @@ def prepDFs(datadir,
 
 def main(datadir,
         train_samples=10000,
+        test_samples=1000,
         val_portion=0.1,
         use_images=True,
         use_text=True,
+        train_image_fn='train_image_features_0_67500.pkl',
+        test_image_fn='test_image_features_0_100000.pkl',
         debug=False):
     '''
     1. run train_val_split on training
@@ -237,14 +244,15 @@ def main(datadir,
     if(debug):
         trainpath = datadir + 'head_train_set.csv'
         testpath = datadir + 'head_test_set.csv'
-        train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+        train_imagepath = datadir + 'train_image_features_0_2500.pkl'
+        test_imagepath = datadir + 'test_image_features_0_2500.pkl'
         train_samples = 90
         test_samples = 90
     else:
         trainpath = datadir + 'train_set.csv'
         testpath = datadir + 'test_set.csv'
-        train_imagepath = datadir + 'train_image_features_0_10000.pkl'
-        test_samples = int(0.1*train_samples)
+        train_imagepath = datadir + train_image_fn
+        test_imagepath = datadir + test_image_fn
 
     dstart=datetime.now()
     plog("Checking to see if prepped data already available...")
@@ -285,7 +293,7 @@ def main(datadir,
     #Load image data
     t1 = datetime.now()
     if use_images:
-        image_data = get_image_matrices(train_imagepath,None,trainDF, valDF, testDF)
+        image_data = get_image_matrices(train_imagepath,test_imagepath,trainDF, valDF, testDF)
         t2 = datetime.now()
         plog("Time to load images: %s" %str(t2-t1))
     else:

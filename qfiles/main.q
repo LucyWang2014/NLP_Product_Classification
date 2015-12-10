@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #PBS -l nodes=1:ppn=2:gpus=1
-#PBS -l walltime=10:00:00
+#PBS -l walltime=2:00:00
 #PBS -l mem=23GB
-#PBS -N main_t_f_10000
+#PBS -N main_f_t_10000
 #PBS -j oe
 
 THEANO_FLAGS='floatX=float32,device=gpu,cuda.root=/share/apps/cuda/6.5.12'

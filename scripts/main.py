@@ -7,26 +7,33 @@ __author__='Charlie Guthrie'
 from utils import create_log,plog,fplog,create_results_file,save_to_results_file
 create_log(__file__)
 
+if len(sys.argv)<2:
+    plog("Usage: python main.py [train_samples] [use_images] [use_text]")
+else:
+    train_samples = sys.argv[1]
+    use_images = sys.argv[2]
+    use_text = sys.argv[3]
+
 plog('importing main.py modules...')
 import os
 import data_prep
 import models
 import pdb
 from datetime import datetime
+import sys
 
 home = os.path.join(os.path.dirname(__file__),'..')
 datadir = os.path.join(home,'data') + '/'
 
-
 #DATA PREP PARAMS
 options_dict = {
-    'train_samples': 10000, #10k, 50k, 100k. test is 10% of train
+    'train_samples': train_samples, #10k, 50k, 100k. test is 10% of train
     'val_portion': 0.1,
-    'use_images': True, # T, F
-    'use_text': False, # T, F
+    'use_images': use_images, # T, F
+    'use_text': use_text, # T, F
     'train_image_fn': 'train_image_features_0_67500.pkl',
     'test_image_fn': 'test_image_features_0_100000.pkl',
-    'debug': True,
+    'debug': False,
 
     #MODEL PARAMS,
     'num_epochs': 200, #200
@@ -52,6 +59,8 @@ if not os.path.exists('../results/'):
 results_path = '../results/model_results_%s_%s_%s.npz' %(use_images,use_text,log_time)
 
 test_samples = int(0.1*train_samples)
+
+plog("Starting data_prep with %s training samples; use_images=%s; use_text=%s" %(train_samples,use_images,use_text))
 data,n_values = data_prep.main(datadir,
                                 train_samples,
                                 test_samples,

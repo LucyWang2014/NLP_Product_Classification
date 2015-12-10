@@ -6,13 +6,18 @@ __author__='Charlie Guthrie'
 
 from utils import create_log,plog,fplog,create_results_file,save_to_results_file
 create_log(__file__)
+import sys
 
+#Command-line arguments
 if len(sys.argv)<2:
-    plog("Usage: python main.py [train_samples] [use_images] [use_text]")
+    plog("Usage: python main.py [num_train_samples] [use_images|use_text]")
+    sys.exit()
 else:
-    train_samples = sys.argv[1]
-    use_images = sys.argv[2]
-    use_text = sys.argv[3]
+    train_samples = int(sys.argv[1])
+    if 'use_images' in sys.argv:
+        use_images=True
+    if 'use_text' in sys.argv:
+        use_text=True
 
 plog('importing main.py modules...')
 import os
@@ -20,7 +25,6 @@ import data_prep
 import models
 import pdb
 from datetime import datetime
-import sys
 
 home = os.path.join(os.path.dirname(__file__),'..')
 datadir = os.path.join(home,'data') + '/'
@@ -58,6 +62,7 @@ if not os.path.exists('../results/'):
     os.makedirs('../results/')
 results_path = '../results/model_results_%s_%s_%s.npz' %(use_images,use_text,log_time)
 
+print train_samples
 test_samples = int(0.1*train_samples)
 
 plog("Starting data_prep with %s training samples; use_images=%s; use_text=%s" %(train_samples,use_images,use_text))

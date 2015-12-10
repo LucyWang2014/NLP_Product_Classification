@@ -347,7 +347,7 @@ def main(data,n_values):
         learning_rate = 0.01,
         valid_freq = 100,
         save_path = '../results/simple_mlp/',
-        saveto = 'simple_mlp.npz',
+        options_dict = None
         reload_model = None,
         num_targets = 3)
 

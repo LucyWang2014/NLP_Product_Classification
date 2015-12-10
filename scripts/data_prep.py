@@ -96,14 +96,15 @@ def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
     return (bow_train, bow_val, bow_test),(idx_train,idx_val,idx_test)
 
 def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
-    plog("Getting image matrices...")
 
     def df2matrix(df):
         return np.array([x[0,:] for x in df.iloc[:,0]]).astype(np.float32)
 
+    plog("Loading train image features from %s..." %train_imagepath)
     with open(train_imagepath,'rb') as f:
         imageDF=pkl.load(f)
 
+    plog("Loading test image features from %s..." %test_imagepath)
     if test_imagepath is not None:
         with open(test_imagepath,'rb') as f:
             test_imageDF = pkl.load(f)
@@ -111,7 +112,7 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
         test_image_matrix = df2matrix(test_imageDF)
         test_image_matrix = test_image_matrix[:testDF.shape[0]]
         assert test_image_matrix.shape[0]==testDF.shape[0]
-    else: test_image=None
+    else: test_image_matrix=None
 
 
 
@@ -119,7 +120,7 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
     train_image_matrix = image_matrix[:trainDF.shape[0],:]
     val_image_matrix = image_matrix[trainDF.shape[0]:trainDF.shape[0] + valDF.shape[0],:]
 
-    return (train_image_matrix, val_image_matrix, test_image)
+    return (train_image_matrix, val_image_matrix, test_image_matrix)
 
 
 def X_y_split(df):

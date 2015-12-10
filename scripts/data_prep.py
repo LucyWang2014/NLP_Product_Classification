@@ -196,13 +196,13 @@ def prepDFs(datadir,
     if(debug):
         trainpath = datadir + 'head_train_set.csv'
         testpath = datadir + 'head_test_set.csv'
-        train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+        train_imagepath = datadir + 'train_image_features_0_2500.pkl'
         train_samples = 90
         test_samples = 90
     else:
         trainpath = datadir + 'train_set.csv'
         testpath = datadir + 'test_set.csv'
-        train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+        train_imagepath = datadir + 'train_image_features_0_2500.pkl'
 
     plog("Loading train csv...")
     trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
@@ -224,8 +224,8 @@ def main(datadir,
         val_portion=0.1,
         use_images=True,
         use_text=True,
-        train_image_fn='train_image_features_0_67500.pkl',
-        test_image_fn='test_image_features_0_100000.pkl',
+        train_image_fn='train_image_features_0_2500.pkl',
+        test_image_fn='test_image_features_0_2500.pkl',
         debug=False):
     '''
     1. run train_val_split on training

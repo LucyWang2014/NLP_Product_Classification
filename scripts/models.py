@@ -9,7 +9,7 @@ Adapted from the MNIST example codes in Lasagne
 
 
 from __future__ import print_function
-from utils import create_log,plog,fplog
+from utils import create_log,plog,fplog,save_to_result_file
 
 import sys
 import os
@@ -113,7 +113,7 @@ def train_simple_model(data = None,
     learning_rate = 0.01,
     valid_freq = 100,
     save_path = '../results/',
-    saveto = 'test_mlp.npz',
+    options_dict = None,
     reload_model = None,
     num_targets = 3):
 
@@ -218,9 +218,11 @@ def train_simple_model(data = None,
                     err.append(e)
                     acc.append(a)
                 history_train_errs.append([err, acc])
-                np.savez(save_path + saveto,
+                save_to_results_file(var_string,results_path)
+                np.savez(save_path,
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
+                        options_dict=options_dict,
                         *params)
 
         # And a full pass over the validation data:
@@ -249,9 +251,10 @@ def train_simple_model(data = None,
                     acc.append(a)
                 history_train_errs.append([err, acc])
                 print('saving...')
-                np.savez(save_path + saveto,
+                np.savez(save_path,
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
+                        options_dict=options_dict,
                          *params)
 
         # Then we print the results for this epoch:
@@ -313,14 +316,13 @@ def train_simple_model(data = None,
 
 
     # Optionally, you could now dump the network weights to a file like this:
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
-    np.savez(save_path + saveto,train_err=train_err / train_batches,
+    np.savez(save_path, train_err=train_err / train_batches,
                         valid_err=val_err / val_batches, 
                         test_err=test_err / test_batches,
                         history_train_errs=history_train_errs,
                         history_valid_errs = history_valid_errs,
                         predictions = test_preds,
+                        options_dict=options_dict,
                          *params)
 
     #

@@ -216,7 +216,6 @@ def prepDFs(datadir,
 
 def main(datadir,
         train_samples=10000,
-        test_samples=1000,
         val_portion=0.1,
         use_images=True,
         use_text=True,
@@ -245,10 +244,11 @@ def main(datadir,
         trainpath = datadir + 'train_set.csv'
         testpath = datadir + 'test_set.csv'
         train_imagepath = datadir + 'train_image_features_0_10000.pkl'
+        test_samples = int(0.1*train_samples)
 
     dstart=datetime.now()
     plog("Checking to see if prepped data already available...")
-    outpath = datadir + 'model_data_%i_%i_%r_%s_%s.pkl'%(train_samples,test_samples,val_portion,use_images,use_text)
+    outpath = datadir + 'model_data_%i_%r_%s_%s.pkl'%(train_samples,val_portion,use_images,use_text)
     if os.path.exists(outpath):
         plog("Data found.  Loading...")
         with open(outpath,'rb') as f:

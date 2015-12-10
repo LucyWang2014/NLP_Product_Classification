@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #PBS -l nodes=1:ppn=2:gpus=1
-#PBS -l walltime=2:00:00
+#PBS -l walltime=4:00:00
 #PBS -l mem=23GB
-#PBS -N main_f_t_10000
+#PBS -N main_10000_multi
 #PBS -j oe
 
 THEANO_FLAGS='floatX=float32,device=gpu,cuda.root=/share/apps/cuda/6.5.12'
@@ -29,4 +29,7 @@ export LD_LIBRARY_PATH=/share/apps/cudnn/6.5/lib64:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/share/apps/cudnn/6.5/lib64:$LIBRARY_PATH
 export CPATH=/share/apps/cudnn/6.5/include:$CPATH
 
-python main.py
+python main.py 50000
+python main.py 50000 use_text
+python main.py 50000 use_images
+python main.py 50000 use_text use_images

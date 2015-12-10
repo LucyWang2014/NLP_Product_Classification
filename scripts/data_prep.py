@@ -104,7 +104,6 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
     with open(train_imagepath,'rb') as f:
         imageDF=pkl.load(f)
     
-    plog("Loading test image features from %s..." %test_imagepath)
     if test_imagepath is not None:
         plog("Loading test image features from %s..." %test_imagepath)
         with open(test_imagepath,'rb') as f:
@@ -197,13 +196,11 @@ def prepDFs(datadir,
     if(debug):
         trainpath = datadir + 'head_train_set.csv'
         testpath = datadir + 'head_test_set.csv'
-        train_imagepath = datadir + 'train_image_features_0_2500.pkl'
         train_samples = 90
         test_samples = 90
     else:
         trainpath = datadir + 'train_set.csv'
         testpath = datadir + 'test_set.csv'
-        train_imagepath = datadir + 'train_image_features_0_2500.pkl'
 
     plog("Loading train csv...")
     trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
@@ -215,9 +212,8 @@ def prepDFs(datadir,
         pkl.dump(brand_list,f)
 
     trainDF = shuffle_and_downsample(trainDF,train_samples)
-    trainDF,valDF = train_val_split(trainDF,val_portion)
     testDF = shuffle_and_downsample(testDF,test_samples)
-    return trainDF,valDF,testDF
+    return trainDF,testDF
 
 def main(datadir,
         train_samples=10000,
@@ -328,23 +324,18 @@ def main(datadir,
 
 if __name__ == '__main__':
     home = os.path.join(os.path.dirname(__file__),'..')
-    #local datadir
-    #datadir = os.path.join(home,'data') + '/'
+    datadir = os.path.join(home,'data') + '/'
 
-    #hpc datadir
-    datadir = '/scratch/cdg356/spring/data/'
-    trainDF,valDF,testDF = prepDFs(datadir,
-                                                train_samples=None,
-                                                test_samples=None,
-                                                val_portion=0.1,
-                                                debug=False)
-
-    
+    trainDF,testDF = prepDFs(datadir,
+                            train_samples=None,
+                            test_samples=100,
+                            val_portion=0.1,
+                            debug=False)
 
     df=trainDF
     dataset="train"
-    iloc0=0
-    iloc1=10000
+    iloc0=69000
+    iloc1=200000
     save_freq=10
     batch_size = 250
     out_pickle_name=dataset+'_image_features/'+dataset+'_image_features'

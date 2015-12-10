@@ -16,8 +16,12 @@ else:
     train_samples = int(sys.argv[1])
     if 'use_images' in sys.argv:
         use_images=True
+    else:
+        use_images=False
     if 'use_text' in sys.argv:
         use_text=True
+    else:
+        use_text=False
 
 plog('importing main.py modules...')
 import os
@@ -60,7 +64,19 @@ start_time = datetime.now()
 log_time = start_time.strftime('%Y%m%d_%H%M%S')
 if not os.path.exists('../results/'):
     os.makedirs('../results/')
-results_path = '../results/model_results_%s_%s_%s.npz' %(use_images,use_text,log_time)
+
+if use_images:
+    image_str='images_'
+else:
+    image_str=''
+
+if use_text:
+    text_str='text_'
+else:
+    text_str=''
+
+sample_str = str(train_samples/1000)+'k_'
+results_path = '../results/results_%s%s%s%s.npz' %(sample_str,image_str,text_str,log_time)
 
 print train_samples
 test_samples = int(0.1*train_samples)

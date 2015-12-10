@@ -3,7 +3,7 @@
 #PBS -l nodes=1:ppn=2:gpus=1
 #PBS -l walltime=10:00:00
 #PBS -l mem=23GB
-#PBS -N test_img_process_0_10k
+#PBS -N test_img_process_67_200k
 #PBS -j oe
 
 THEANO_FLAGS='floatX=float32,device=gpu,cuda.root=/share/apps/cuda/6.5.12'

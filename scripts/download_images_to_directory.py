@@ -67,7 +67,8 @@ def prep_image(url,idx,dataset,datadir,width=224,filetype='jpg',verbose=False):
             plt.imsave(outpath,rawim)
             return rawim
         except:
-            print "unable to download"
+            print "unable to download image #%i from url %s..." %(idx,url)
+            return None
     else:
         if verbose:
             print "Image %i already downloaded. Loading from file..." % idx

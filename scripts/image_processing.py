@@ -76,13 +76,14 @@ def prep_for_vgg(url,i,dataset,datadir,width=224,filetype="jpg"):
 
     args: same as that of dl.prep_image
         url: url of image source
-        idx: image row index
+        i: image index
         dataset: string 'train' or 'test' or other identifier
         datadir: data directory
         width: desired width of image. Will be resized to width squared
     returns:
         rawim: scaled and cropped image
     '''
+    import ipdb; ipdb.set_trace()
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
     # Shuffle axes to c01
     im = np.swapaxes(np.swapaxes(rawim, 1, 2), 0, 1)
@@ -110,7 +111,14 @@ def batch_extract_features(batch_series,dataset,datadir,width,filetype):
     indexes = batch_series.index
     first=True
     for i,url in image_urls.iteritems():
-        im = prep_for_vgg(url,i,dataset,datadir,width,filetype)
+        plog(i)
+        plog(url)
+        import ipdb; ipdb.set_trace()
+        try:
+            im = prep_for_vgg(url,i,dataset,datadir,width,filetype)
+        except:
+            plog("error processing image %i from url %s" %(i,url))
+            im = None
         if first==True:
             images = im
             first=False
@@ -150,6 +158,7 @@ def get_selected_image_features(df,
     returns:
         none
     '''
+    plog("Beginning feature extraction...")
     assert iloc0<=df.shape[0]
     assert iloc1<=df.shape[0]
     image_urls = df.large_image_URL.iloc[iloc0:iloc1]

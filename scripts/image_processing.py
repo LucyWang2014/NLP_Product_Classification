@@ -10,7 +10,6 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import pdb
 import theano
 import cPickle as pkl
 import download_images_to_directory as dl
@@ -113,9 +112,6 @@ def batch_extract_features(batch_series,dataset,datadir,width,filetype):
     indexes = batch_series.index
     first=True
     for i,url in image_urls.iteritems():
-        plog(i)
-        plog(url)
-        import ipdb; ipdb.set_trace()
         im = prep_for_vgg(url,i,dataset,datadir,width,filetype)
         if first==True:
             images = im

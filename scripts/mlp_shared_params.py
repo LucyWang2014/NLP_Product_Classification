@@ -289,6 +289,7 @@ def train_model(model='custom_mlp: ',
     target_var = T.ivector('target')
 
     n_val_keys = n_values.keys()
+
     if cat != 1:
         prev_cat_var = T.matrix('prev_inputs',dtype='float32')
         classifier_layer_shape = width + n_values[n_val_keys[cat]]
@@ -315,7 +316,7 @@ def train_model(model='custom_mlp: ',
         if shared_params is not None:
             lasagne.layers.set_all_param_values(network, shared_params)
         network = classifier_layer(network, 
-            prev_cat_var, n_values[n_val_keys[cat]], layer_shape = classifier_layer_shape)
+            prev_cat_var, n_values[n_val_keys[cat+1]], layer_shape = classifier_layer_shape)
     else:
         print("Unrecognized model type %r." % model)
         return
@@ -377,11 +378,9 @@ def train_model(model='custom_mlp: ',
             target = [train[2][idx] for idx in batch]
             if cat != 1:
                 prev_inputs = [train_prev_cat[idx] for idx in batch]
-                print(len(prev_inputs))
                 target = [train[cat + 1][idx] for idx in batch]
                 prev_inputs = one_hot_encode_features(prev_inputs,
                     n_values = n_values[n_val_keys[cat]])
-                print(prev_inputs.shape)
             desc = one_hot_encode_features(inputs[0],n_values = n_values['desc'])
             brands = one_hot_encode_features(inputs[1],n_values = n_values['brands'])
             inputs = np.hstack((desc, brands))
@@ -778,12 +777,12 @@ def main():
     print("Loading data...")
     data, n_values = get_data(
         test_size=10000,  # If >0, we keep only this number of test example.
-        train_size = 50000, # If >0, we keep only this number of train example.
+        train_size = 100000, # If >0, we keep only this number of train example.
         valid_portion = 0.1,
         desc_n_values = desc_n_values)
 
     #create model
-    '''
+   
     params, preds = train_simple_model(model='custom_mlp', 
         data = data,
         n_values = n_values,
@@ -795,7 +794,7 @@ def main():
         learning_rate = 0.01,
         valid_freq = 1000,
         save_path = save_path,
-        saveto = 'simple_mlp_50000.npz',
+        saveto = 'simple_mlp_100000.npz',
         reload_model = None,
         num_targets = 3)
     
@@ -839,7 +838,7 @@ def main():
         reload_model = None,
         shared_params = param_values_1,
         cat = 2,
-        prev_predictions = test_preds_2)
+        prev_predictions = test_preds_1)
 
     print('train level 3')
     param_values_3, test_preds_3 = train_model(model='classifier_layer',
@@ -857,12 +856,12 @@ def main():
         save_path = save_path,
         saveto = 'mlp_cat_3.npz',
         reload_model = None,
-        shared_params = param_values_2,
+        shared_params = param_values_1,
         cat = 3,
         prev_predictions = test_preds_2)
 
     np.savez(save_path + 'targets.pkl', data[2])
-
+    '''	
 if __name__ == '__main__':
     if ('--help' in sys.argv) or ('-h' in sys.argv):
         print("Trains a neural network on MNIST using Lasagne.")

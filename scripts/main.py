@@ -39,7 +39,7 @@ options_dict = {
     'val_portion': 0.1,
     'use_images': use_images, # T, F
     'use_text': use_text, # T, F
-    'train_image_fn': 'train_image_features_0_67500.pkl',
+    'train_image_fn': 'train_image_features_0_100000.pkl',
     'test_image_fn': 'test_image_features_0_100000.pkl',
     'debug': False,
 

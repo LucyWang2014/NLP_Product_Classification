@@ -1,19 +1,9 @@
-#LOGGING BOILERPLATE
-from datetime import datetime
-start_time = datetime.now()
-import os
-#make log file if it doesn't exist
-if not os.path.exists('logs'):
-    os.makedirs('logs')
-#logging boilerplate.  To log anything type log.info('stuff you want to log')
-import logging as log
-#log file with filename, HMS time
-log.basicConfig(filename='logs/%s%s.log' %(__file__.split('.')[0],start_time.strftime('_%Y%m%d_%H%M%S')),level=log.DEBUG)
-
-def plog(msg):
-    print msg
-    log.info(msg)
-
+'''
+Stitch separate image files together
+'''
+__author__='Charlie Guthrie'
+from utils import create_log,plog
+create_log(__file__)
 import pandas as pd
 import cPickle as pkl
 import os
@@ -26,11 +16,13 @@ def get_indexes(fname):
     iloc1 = fname.split('.')[0].split('_')[-1]
     return int(iloc0),int(iloc1)
 
-def stitch_files(basename):
+def stitch_files(basename,idx_start=0,idx_finish=None):
     '''
     Cycles through all files in the basename directory and stacks them together.
     args:
         basename: name without indexes, e.g. 'train_image_features'
+        idx_start: starting index (usually 0)
+        idx_finish: last index of the output file
     returns:
         none.  saves pickle of images stitched together
         
@@ -45,8 +37,10 @@ def stitch_files(basename):
     for root, dirs, files in os.walk(featuredir):
         for fname in files:
             idx_range = get_indexes(fname)
-            iloc0_list.append(idx_range[0])
-            iloc1_list.append(idx_range[1])
+            if idx_range[0] is not None and idx_range[1] is not None:
+                if idx_range[0]>=idx_start and idx_range[1]<=idx_finish:
+                    iloc0_list.append(idx_range[0])
+                    iloc1_list.append(idx_range[1])
     iloc0_list.sort()
     iloc1_list.sort()
 
@@ -71,7 +65,14 @@ def stitch_files(basename):
                 df=pd.concat([df,df2])
         plog("df shape: %s" %str(df.shape))
     max_index = max(iloc1_list)
-    outname = datadir + basename + '_0_%s.pkl'%max_index
+
+    # A couple sanity checks
+    assert max_index == iloc1_list[-1]
+    if idx_finish is not None:
+        assert idx_finish==max_index
+    assert idx_start==iloc0_list[0]
+    
+    outname = datadir + basename + '_%i_%i.pkl'%(idx_start,max_index)
 
     plog("writing to %s..." %outname)
     with open(outname,'wb') as f:
@@ -79,4 +80,4 @@ def stitch_files(basename):
         
 
 if __name__ == '__main__':
-    stitch_files('train_image_features')
+    stitch_files('train_image_features',0,200000)

@@ -83,16 +83,18 @@ def prep_for_vgg(url,i,dataset,datadir,width=224,filetype="jpg"):
     returns:
         rawim: scaled and cropped image
     '''
-    import ipdb; ipdb.set_trace()
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
-    # Shuffle axes to c01
-    im = np.swapaxes(np.swapaxes(rawim, 1, 2), 0, 1)
+    if rawim is None: #If image fails to download, produce 'image' of NaN's with same shape
+        im=np.tile(np.nan,(3,width,width))
+    else:
+        # Shuffle axes to c01
+        im = np.swapaxes(np.swapaxes(rawim, 1, 2), 0, 1)
 
-    # Convert to BGR
-    im = im[::-1, :, :]
+        # Convert to BGR
+        im = im[::-1, :, :]
 
-    im = im - MEAN_IMAGE
-    im=floatX(im[np.newaxis])
+        im = im - MEAN_IMAGE
+        im=floatX(im[np.newaxis])
     return im
 
 def batch_extract_features(batch_series,dataset,datadir,width,filetype):
@@ -114,11 +116,7 @@ def batch_extract_features(batch_series,dataset,datadir,width,filetype):
         plog(i)
         plog(url)
         import ipdb; ipdb.set_trace()
-        try:
-            im = prep_for_vgg(url,i,dataset,datadir,width,filetype)
-        except:
-            plog("error processing image %i from url %s" %(i,url))
-            im = None
+        im = prep_for_vgg(url,i,dataset,datadir,width,filetype)
         if first==True:
             images = im
             first=False

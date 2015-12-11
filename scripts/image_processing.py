@@ -10,7 +10,6 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import pdb
 import theano
 import cPickle as pkl
 import download_images_to_directory as dl
@@ -83,7 +82,6 @@ def prep_for_vgg(url,i,dataset,datadir,width=224,filetype="jpg"):
     returns:
         rawim: scaled and cropped image
     '''
-    import ipdb; ipdb.set_trace()
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
     # Shuffle axes to c01
     im = np.swapaxes(np.swapaxes(rawim, 1, 2), 0, 1)
@@ -111,9 +109,6 @@ def batch_extract_features(batch_series,dataset,datadir,width,filetype):
     indexes = batch_series.index
     first=True
     for i,url in image_urls.iteritems():
-        plog(i)
-        plog(url)
-        import ipdb; ipdb.set_trace()
         try:
             im = prep_for_vgg(url,i,dataset,datadir,width,filetype)
         except:

@@ -4,7 +4,7 @@ End-to-end script for running all processes.
 '''
 __author__='Charlie Guthrie'
 
-from utils import create_log,plog,fplog,create_results_file,save_to_results_file
+from utils import create_log,plog,fplog
 create_log(__file__)
 import sys
 

@@ -4,7 +4,7 @@ End-to-end script for running all processes.
 '''
 __author__='Charlie Guthrie'
 
-from utils import create_log,plog,fplog,create_results_file,save_to_results_file
+from utils import create_log,plog,fplog
 create_log(__file__)
 import sys
 
@@ -39,7 +39,7 @@ options_dict = {
     'val_portion': 0.1,
     'use_images': use_images, # T, F
     'use_text': use_text, # T, F
-    'train_image_fn': 'train_image_features_0_67500.pkl',
+    'train_image_fn': 'train_image_features_0_100000.pkl',
     'test_image_fn': 'test_image_features_0_100000.pkl',
     'debug': False,
 

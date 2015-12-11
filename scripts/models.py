@@ -226,7 +226,6 @@ def train_simple_model(data = None,
                         *params)
 
         # And a full pass over the validation data:
-        #CG: Repeat some of the above, or make it a function
         val_err = np.zeros(num_targets)
         val_acc = np.zeros(num_targets)
         val_batches = 0
@@ -265,6 +264,8 @@ def train_simple_model(data = None,
         max_val = np.max(val_err / val_batches)
         min_val = np.min(val_err / val_batches)
         avg_val_acc = np.mean(val_acc / val_batches)
+        fplog(" train_batches: %i" %train_batches)
+        fplog(" val_batches: %i" %val_batches)
         fplog("  max training loss:\t\t{:.6f}".format(max_train))
         fplog("  min training loss:\t\t{:.6f}".format(min_train))
         fplog("  max validation loss:\t\t{:.6f}".format(max_val))

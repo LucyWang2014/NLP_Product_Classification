@@ -84,7 +84,7 @@ def prep_for_vgg(url,i,dataset,datadir,width=224,filetype="jpg"):
     '''
     rawim = dl.prep_image(url,i,dataset,datadir,width,filetype)
     if rawim is None: #If image fails to download, produce 'image' of NaN's with same shape
-        im=np.tile(np.nan,(1,3,width,width))
+        im=floatX(np.tile(0,(1,3,width,width)))
     else:
         # Shuffle axes to c01
         im = np.swapaxes(np.swapaxes(rawim, 1, 2), 0, 1)

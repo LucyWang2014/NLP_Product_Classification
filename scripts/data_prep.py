@@ -16,7 +16,6 @@ import pandas as pd
 import numpy as np
 import pdb
 import cPickle as pkl
-import image_processing
 import bag_of_words
 
 
@@ -334,12 +333,13 @@ if __name__ == '__main__':
 
     df=trainDF
     dataset="train"
-    iloc0=69000
+    iloc0=67500
     iloc1=200000
     save_freq=10
     batch_size = 250
     out_pickle_name=dataset+'_image_features/'+dataset+'_image_features'
 
+    import image_processing
     image_processing.get_selected_image_features(df,
                                 datadir,
                                 dataset,

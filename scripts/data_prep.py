@@ -17,27 +17,8 @@ import numpy as np
 import pdb
 import cPickle as pkl
 import bag_of_words
+from sklearn.preprocessing import OneHotEncoder
 
-
-#TODO: 
-# 1. Validation set currently depends on number of samples.  Need to be aware of this with image processing
-# 2. run image feature extraction on shuffled dataset.  We aren't going to have time to get them all.  
-
-
-def get_brand_index(trainDF,testDF):
-    '''
-    converts brand names to indexes
-    '''
-    def apply_brand_index(brand,brand_list):
-        if brand in brand_list:
-            return brand_list.index(brand)
-        else:
-            return None
-        
-    brands = list(trainDF.brand.unique())
-    trainDF['brand_num']=trainDF.brand.apply(apply_brand_index,args=[brands])
-    testDF['brand_num']=testDF.brand.apply(apply_brand_index,args=[brands])
-    return brands
 
 def shuffle_and_downsample(df,samples):
     '''
@@ -78,8 +59,48 @@ def train_val_split(df,val_portion):
     assert valDF.shape[1]==trainDF.shape[1]
     return trainDF, valDF
 
+def get_brand_index(trainDF,testDF):
+    '''
+    converts brand names to indexes
+    '''
+    def apply_brand_index(brand,brand_list):
+        if brand in brand_list:
+            return brand_list.index(brand)
+        else:
+            return 0
+        
+    brands = list(trainDF.brand.unique())
+    #add a zero for unknowns
+    brands.insert(0, 'NA')
+
+    trainDF['brand_num']=trainDF.brand.apply(apply_brand_index,args=[brands])
+    testDF['brand_num']=testDF.brand.apply(apply_brand_index,args=[brands])
+    
+    trainDF['brand_num'].fillna(0, inplace=True)
+    testDF['brand_num'].fillna(0, inplace=True)
+    return brands
+
+def build_brand_matrices(trainDF, valDF, testDF):
+    '''
+    one-hot encode brand indexes
+    '''
+    plog("Building brand matrices...")
+    enc = OneHotEncoder(handle_unknown='ignore')
+    train_vect = np.reshape(trainDF.brand_num.values,(-1,1))
+    brands_train = enc.fit_transform(train_vect).toarray()
+
+    val_vect = np.reshape(valDF.brand_num.values,(-1,1))    
+    brands_val = enc.transform(val_vect).toarray()
+
+    test_vect = np.reshape(testDF.brand_num.values,(-1,1))
+    brands_test = enc.transform(test_vect).toarray()
+    return (brands_train, brands_val, brands_test)
+
 #Get text data
 def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
+    '''
+    use bag-of-words representation to convert descriptions into bag-of-words matrices
+    '''
     plog("Building text matrices...")
     with open(tokenizer_path) as f:
         tokenizer=pkl.load(f)
@@ -120,17 +141,14 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
     return (train_image_matrix, val_image_matrix, test_image_matrix)
 
 
-def X_y_split(df):
+def get_targets(df):
     '''
-    Split data frame into matrices of X and y variables, then output as float32/int32
+    Retrieve target labels and output as float32/int32
     '''
-    #X=df.loc[:,'brand_num','description_clean','large_image_URL','cat_1','cat_2','cat_3','cat_1_num','cat_2_num','cat_3_num']
-    X = df.loc[:,'brand_num'].values
-    X = np.reshape(X,(len(X),1)).astype(np.float32)
     y1 = df.loc[:,'cat_1_num'].values.astype(np.int32)
     y2 = df.loc[:,'cat_2_num'].values.astype(np.int32)
     y3 = df.loc[:,'cat_3_num'].values.astype(np.int32)
-    return X,y1,y2,y3
+    return y1,y2,y3
 
 
 
@@ -296,10 +314,11 @@ def main(datadir,
         image_data=None
 
     #Load other data
-    other_train,y1_train,y2_train,y3_train=X_y_split(trainDF)
-    other_val,y1_val,y2_val,y3_val=X_y_split(valDF)
-    other_test,y1_test,y2_test,y3_test=X_y_split(testDF)
-    other_data = (other_train,other_val,other_test)
+    y1_train,y2_train,y3_train=get_targets(trainDF)
+    y1_val,y2_val,y3_val=get_targets(valDF)
+    y1_test,y2_test,y3_test=get_targets(testDF)
+
+    other_data = build_brand_matrices(trainDF, valDF, testDF)
 
     X_train,X_val,X_test = merge_data(bow_data,image_data,other_data)
 

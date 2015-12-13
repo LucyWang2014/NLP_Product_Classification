@@ -17,7 +17,7 @@ import pdb
 import copy 
 
 datasets = {'nordstrom': (nordstrom.load_data, nordstrom.prepare_data)}
-folder_path = '/Users/LittleLucy/Google Drive/MSDS/2015Fall/DSGA3001_NLP_Distributed_Representation/Project/'
+folder_path = '../'
 
 
 # Set the random number generators' seeds for consistency
@@ -973,12 +973,12 @@ def pred_multiple(data = None, model_options_1 = None,
 
 def main():
 
-    data = get_data(test_size=1000, 
-        train_size = 10000,
+    data = get_data(test_size=5000, 
+        train_size = 50000,
         dataset='nordstrom',
         path = 'data/encode_cats/')
 
-    save_path = '/Users/LittleLucy/Google Drive/MSDS/2015Fall/DSGA3001_NLP_Distributed_Representation/Project/results/'
+    save_path = '../results/'
     save_folder = 'pred_probs/'
     
     train, valid, test, dictionary = data
@@ -1057,9 +1057,9 @@ def main():
     print 'hard -  all_errors: %s | two_cat_errors : %s | one_cat_errors: %s' %(hard_all_err, hard_two_cat_err, hard_one_cat_err)
     print 'soft - all_errors: %s | two_cat_errors : %s | one_cat_errors: %s' %(soft_all_err, soft_two_cat_err, soft_one_cat_err)
 
-    #numpy.savez(saveto, train_err_1=train_err_1,
-    #                valid_err_1=valid_err_1, test_err_1=test_err_1,
-    #                history_errs=history_errs, **best_p)
+    numpy.savez(saveto, train_err_1=train_err_1,
+                   valid_err_1=valid_err_1, test_err_1=test_err_1,
+                    history_errs=history_errs, **best_p)
 if __name__ == '__main__':
     # See function train for all possible parameter and there definition.
     main()

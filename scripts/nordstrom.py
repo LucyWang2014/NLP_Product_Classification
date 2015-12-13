@@ -132,8 +132,10 @@ def load_data(path="nordstrom", n_words=100000, valid_portion=0.1, maxlen=None,
     #    f = gzip.open(path, 'rb')
     #else:
     f_train = open(path + '_train.pkl', 'rb')
+    print path + '_train.pkl'
     f_test = open(path + '_test.pkl', 'rb')
     dictionary_f = open(path + '.dict.pkl','rb')
+
 
     train_set = cPickle.load(f_train)
     test_set = cPickle.load(f_test)

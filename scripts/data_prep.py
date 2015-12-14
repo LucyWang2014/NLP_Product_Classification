@@ -59,9 +59,9 @@ def train_val_split(df,val_portion):
     assert valDF.shape[1]==trainDF.shape[1]
     return trainDF, valDF
 
-def get_brand_index(trainDF,testDF):
+def get_brand_index(trainDF,valDF,testDF):
     '''
-    converts brand names to indexes
+    converts brand names to indexes.  Unknown brands get coded zero
     '''
     def apply_brand_index(brand,brand_list):
         if brand in brand_list:
@@ -74,9 +74,11 @@ def get_brand_index(trainDF,testDF):
     brands.insert(0, 'NA')
 
     trainDF['brand_num']=trainDF.brand.apply(apply_brand_index,args=[brands])
+    valDF['brand_num']=valDF.brand.apply(apply_brand_index,args=[brands])
     testDF['brand_num']=testDF.brand.apply(apply_brand_index,args=[brands])
     
     trainDF['brand_num'].fillna(0, inplace=True)
+    valDF['brand_num'].fillna(0, inplace=True)
     testDF['brand_num'].fillna(0, inplace=True)
     return brands
 
@@ -84,8 +86,12 @@ def build_brand_matrices(trainDF, valDF, testDF):
     '''
     one-hot encode brand indexes
     '''
+    brand_list = get_brand_index(trainDF,valDF,testDF)
+    with open(datadir + 'brand_list.pkl','wb') as f:
+        pkl.dump(brand_list,f)
+
     plog("Building brand matrices...")
-    enc = OneHotEncoder(handle_unknown='ignore')
+    enc = OneHotEncoder()
     train_vect = np.reshape(trainDF.brand_num.values,(-1,1))
     brands_train = enc.fit_transform(train_vect).toarray()
 
@@ -224,10 +230,6 @@ def prepDFs(datadir,
     plog("Loading test csv...")
     testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
 
-    brand_list = get_brand_index(trainDF,testDF)
-    with open(datadir + 'brand_list.pkl','wb') as f:
-        pkl.dump(brand_list,f)
-
     trainDF = shuffle_and_downsample(trainDF,train_samples)
     testDF = shuffle_and_downsample(testDF,test_samples)
     return trainDF,testDF
@@ -287,10 +289,6 @@ def main(datadir,
     trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
     plog("Loading test csv...")
     testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
-
-    brand_list = get_brand_index(trainDF,testDF)
-    with open(datadir + 'brand_list.pkl','wb') as f:
-        pkl.dump(brand_list,f)
 
     trainDF = shuffle_and_downsample(trainDF,train_samples)
     trainDF,valDF = train_val_split(trainDF,val_portion)

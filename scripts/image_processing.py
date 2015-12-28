@@ -37,6 +37,7 @@ def load_pretrained_model(datadir):
 def build_image_network():
     '''
     builds CNN for image feature extraction
+    CNN is designed to match the pretrained network from VGG
 
     returns:
         network
@@ -96,9 +97,10 @@ def prep_for_vgg(url,i,dataset,datadir,width=224,filetype="jpg"):
         im=floatX(im[np.newaxis])
     return im
 
+#TODO: modify so it adds to a csv instead of saving a pickle
 def batch_extract_features(batch_series,dataset,datadir,width,filetype):
     '''
-    take batch_series and return dataframe of image features with shape (batchDF.shape[0],4096)
+    take batch_series and return dataframe of image features with shape (batch_series.shape[0],4096)
     args:
         batch_series:
         dataset: "train" or "test"
@@ -119,7 +121,6 @@ def batch_extract_features(batch_series,dataset,datadir,width,filetype):
         else:
             images = np.vstack((images,im))
     
-    #image_features = np.reshape(images,(images.shape[0],-1))
     #get last layer from vgg model.  This part takes ~1-4 seconds
     image_features = np.array(lasagne.layers.get_output(IMAGE_NET['fc7'], images, deterministic=True).eval())
 
@@ -171,8 +172,12 @@ def get_selected_image_features(df,
         
         if iloc>iloc0 and (batch_num%save_freq==0 or iloc>=iloc1-1):
             plog("Saving from image iloc %i to image iloc %i" %(prev_iloc,iloc))
-            with open(datadir+out_pickle_name + '_' + str(prev_iloc) + '_' + str(iloc)+'.pkl','wb') as outf:
-                pkl.dump(featureDF,outf)  
+            #Append to csv here
+            with open('csv_fn.csv','a') as outf:
+                featureDF.to_csv(outf,header=False)
+
+            #with open(datadir+out_pickle_name + '_' + str(prev_iloc) + '_' + str(iloc)+'.pkl','wb') as outf:
+            #    pkl.dump(featureDF,outf)  
             prev_iloc = iloc
 
             #reset featureDF to save memory

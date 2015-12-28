@@ -119,8 +119,9 @@ def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
     bow_test, idx_test = bag_of_words.series_to_bag_of_words(testDF.description_clean,tokenizer,test_text_matrix_path,mode="binary")
 
     plog("bow_train type: %s" %type(bow_train))
-    return (bow_train, bow_val, bow_test),(idx_train,idx_val,idx_test)
+    return (bow_train, bow_val, bow_test)
 
+#TODO: modify this to only load a batch of images at a time, from a csv or mmap instead of pickle
 def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
     '''
     load images from pkl files and convert to matrices
@@ -296,7 +297,7 @@ def main(datadir,
     #Load text data
     t0 = datetime.now()
     if use_text:
-        bow_data,idxs=build_text_matrices(datadir, 'tokenizer_5000.pkl', trainDF, valDF, testDF)
+        bow_data=build_text_matrices(datadir, 'tokenizer_5000.pkl', trainDF, valDF, testDF)
         t1 = datetime.now()
         plog("Time to load text: %s" %str(t1-t0))
     else:

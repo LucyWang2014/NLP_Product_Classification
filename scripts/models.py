@@ -2,11 +2,6 @@
 Adapted from the MNIST example codes in Lasagne
 
 """
-#TODO:
-#in iterate_minibatch: turn off shuffle.
-#get rid of anything that says one-hot encode
-#delete the vanilla build_mlp
-
 
 from __future__ import print_function
 from utils import create_log,plog,fplog
@@ -20,10 +15,7 @@ import collections
 import numpy as np
 import theano
 import theano.tensor as T
-
 import lasagne
-
-from mlp_functions import one_hot_encode_features
 
 import pdb
 
@@ -77,6 +69,8 @@ def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=np.float32(
 # own custom data iteration function. For small datasets, you can also copy
 # them to GPU at once for slightly improved performance. This would involve
 # several changes in the main program, though, and is not demonstrated here.
+
+#TODO: modify to load data from here
 def iterate_minibatches(data, batchsize, shuffle=False):
     inputs = data[0]
     targets = data[1:4]
@@ -117,6 +111,10 @@ def train_simple_model(data = None,
     reload_model = None,
     num_targets = 3):
 
+    #TODO: eliminate data from this function.  Instead refer to a filename for data.
+    #TODO: Rewrite iterate_minibatch to iterate through a file. 
+        #Either use numpy's mmap or csv
+    #TODO: load the first line of said file to get layer_shape
     train, valid, test = data
 
     #X width, so the model knows how wide to make the first layer
@@ -220,7 +218,7 @@ def train_simple_model(data = None,
                 history_train_errs.append([err, acc])
                 save_to_results_file(var_string,results_path)
                 np.savez(save_path,
-                        history_train_errs=history_train_errs,
+                        history_train_errs = history_train_errs,
                         history_valid_errs = history_valid_errs,
                         options_dict=options_dict,
                         *params)

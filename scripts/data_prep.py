@@ -102,6 +102,18 @@ def build_brand_matrices(trainDF, valDF, testDF):
     brands_test = enc.transform(test_vect).toarray()
     return (brands_train, brands_val, brands_test)
 
+def build_text_matrix(datadir, dataset_name, tokenizer, df):
+    '''
+    use bag-of-words representation to convert description_clean into bag-of-words matrix
+    '''
+    plog("Building text matrices...")
+    text_matrix_path=datadir + dataset_name + '_text.mmap'
+
+    bow_matrix = bag_of_words.series_to_bag_of_words(df.description_clean,tokenizer,text_matrix_path,mode="binary")
+    return bow_matrix
+
+
+
 #Get text data
 def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
     '''
@@ -159,14 +171,14 @@ def get_targets(df):
 
 
 
-def conditional_hstack(other,bow,image,dataset_name):
+def conditional_hstack(brand,bow,image,dataset_name):
     '''
-    assumes other is present.
-    if bag of words is not none, hstack it
-    if image is not None, hstack it
+    assumes 'brand' is present.
+    if bag of words is not none, hstack it to brand
+    if image is not None, hstack it to brand
     '''
-    if other is not None:
-        X=other
+    if brand is not None:
+        X=brand
         if bow is not None:
             assert bow.shape[0]==X.shape[0]
             X = np.hstack((X,bow))
@@ -179,7 +191,7 @@ def conditional_hstack(other,bow,image,dataset_name):
             plog("Image data missing from %s" %dataset_name)
     return X
 
-def merge_data(bows,images,others):
+def merge_data(bows,images,brands):
     '''
     merge together the datasets to be used in the model
     args:
@@ -193,12 +205,16 @@ def merge_data(bows,images,others):
         images= (None,None,None)
 
     plog("Merging data...")
-    X_train = conditional_hstack(others[0],bows[0],images[0],'train')
-    X_val = conditional_hstack(others[1],bows[1],images[1],'val')
-    X_test = conditional_hstack(others[2],bows[2],images[2],'test')
+    X_train = conditional_hstack(brands[0],bows[0],images[0],'train')
+    X_val = conditional_hstack(brands[1],bows[1],images[1],'val')
+    X_test = conditional_hstack(brands[2],bows[2],images[2],'test')
 
     return X_train.astype(np.float32), X_val.astype(np.float32), X_test.astype(np.float32)
-    
+
+def iterate_batches(trainDF,valDF,testDF, batch_size):
+    '''
+    iterate through 
+    '''
 
 def prepDFs(datadir,
         train_samples=10000,
@@ -235,6 +251,7 @@ def prepDFs(datadir,
     testDF = shuffle_and_downsample(testDF,test_samples)
     return trainDF,testDF
 
+#TODO: don't return data, save it to a file.
 def main(datadir,
         train_samples=10000,
         test_samples=1000,
@@ -248,7 +265,6 @@ def main(datadir,
     1. run train_val_split on training
     1b. run shuffle on test
     2. if text:
-        a. train tokenizer
         b. convert text data to bag of words matrix
     3. if images:
         a. extract image data
@@ -272,31 +288,43 @@ def main(datadir,
         test_imagepath = datadir + test_image_fn
 
     dstart=datetime.now()
-    plog("Checking to see if prepped data already available...")
-    outpath = datadir + 'model_data_%i_%r_%s_%s.pkl'%(train_samples,val_portion,use_images,use_text)
-    if os.path.exists(outpath):
-        plog("Data found.  Loading...")
-        with open(outpath,'rb') as f:
-            data,n_values = pkl.load(f)
-
-        dfin = datetime.now()
-        plog("Data loading time: %s" %(dfin-dstart))
-        return data,n_values
-
-    plog("Prepped data not available.  Preparing data...")
 
 
     plog("Loading train csv...")
-    trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
+    raw_trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
     plog("Loading test csv...")
-    testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
+    raw_testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
 
-    trainDF = shuffle_and_downsample(trainDF,train_samples)
-    trainDF,valDF = train_val_split(trainDF,val_portion)
-    testDF = shuffle_and_downsample(testDF,test_samples)
-    #Load text data
-    t0 = datetime.now()
     if use_text:
+        plog("Loading tokenizer...")
+        with open(datadir + 'tokenizer_5000.pkl') as f:
+            tokenizer=pkl.load(f)
+
+    full_trainDF = shuffle_and_downsample(raw_trainDF,train_samples)
+    full_testDF = shuffle_and_downsample(raw_testDF,test_samples)
+    full_trainDF,full_valDF = train_val_split(full_trainDF,val_portion)
+
+    #TODO: cut trainDF, valDF, and testDF into batches
+    #TODO: rewrite all of this to operate on train, val, then test, sequentially
+    #START HERE
+    #then run the following:
+    for batch in iterate_batches(full_trainDF, batch_size):
+        trainDF = batch
+
+        #Load text data
+        if use_text:
+            t0 = datetime.now()            
+            bow_train = build_text_matrix(tokenizer,trainDF)
+            t1 = datetime.now()
+            plog("Time to load text: %s" %str(t1-t0))
+        else:
+            bow_data=None
+
+
+
+    #Load text data
+    if use_text:
+        t0 = datetime.now()
         bow_data=build_text_matrices(datadir, 'tokenizer_5000.pkl', trainDF, valDF, testDF)
         t1 = datetime.now()
         plog("Time to load text: %s" %str(t1-t0))
@@ -304,22 +332,24 @@ def main(datadir,
         bow_data=None
 
     #Load image data
-    t1 = datetime.now()
+    
     if use_images:
+        t0 = datetime.now()
         image_data = get_image_matrices(train_imagepath,test_imagepath,trainDF, valDF, testDF)
-        t2 = datetime.now()
-        plog("Time to load images: %s" %str(t2-t1))
+        t1 = datetime.now()
+        plog("Time to load images: %s" %str(t1-t0))
     else:
         image_data=None
 
-    #Load other data
+    #Load targets
     y1_train,y2_train,y3_train=get_targets(trainDF)
     y1_val,y2_val,y3_val=get_targets(valDF)
     y1_test,y2_test,y3_test=get_targets(testDF)
 
-    other_data = build_brand_matrices(trainDF, valDF, testDF)
+    #Load brand data
+    brand_data = build_brand_matrices(trainDF, valDF, testDF)
 
-    X_train,X_val,X_test = merge_data(bow_data,image_data,other_data)
+    X_train,X_val,X_test = merge_data(bow_data,image_data,brand_data)
 
     train_data = X_train, y1_train, y2_train, y3_train
     val_data = X_val, y1_val, y2_val, y3_val
@@ -337,7 +367,6 @@ def main(datadir,
     dfin = datetime.now()
     plog("Data loading time: %s" %(dfin-dstart))
 
-    return data,n_values
 
 if __name__ == '__main__':
     home = os.path.join(os.path.dirname(__file__),'..')

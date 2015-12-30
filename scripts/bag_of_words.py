@@ -50,7 +50,7 @@ def series_to_bag_of_words(series,tokenizer,text_matrix_path,mode="binary"):
         pkl.dump(text_matrix,outf)
     #return pd.DataFrame(text_matrix, index=series.index)
     assert text_matrix.shape==(len(idx),tokenizer.nb_words)
-    return text_matrix,idx
+    return text_matrix
 
 def main():
     DATADIR = '../data/'

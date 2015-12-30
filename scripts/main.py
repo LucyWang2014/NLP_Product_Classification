@@ -81,16 +81,24 @@ results_path = '../results/results_%s%s%s%s.npz' %(sample_str,image_str,text_str
 print train_samples
 test_samples = int(0.1*train_samples)
 
-plog("Starting data_prep with %s training samples; use_images=%s; use_text=%s" %(train_samples,use_images,use_text))
-data,n_values = data_prep.main(datadir,
-                                train_samples,
-                                test_samples,
-                                val_portion,
-                                use_images,
-                                use_text,
-                                train_image_fn,
-                                test_image_fn,
-                                debug)
+dstart=datetime.now()
+plog("Checking to see if prepped data already available...")
+#TODO: change this to check for the appropriate train, val, test sets
+data_path = datadir + 'model_data_%i_%r_%s_%s.pkl'%(train_samples,val_portion,use_images,use_text)
+if os.path.exists(outpath):
+    plog("Data found. Moving on to models.py")
+else:
+    plog("Prepped data not available.")
+    plog("Starting data_prep with %s training samples; use_images=%s; use_text=%s" %(train_samples,use_images,use_text))
+    data_prep.main(datadir,
+                    train_samples,
+                    test_samples,
+                    val_portion,
+                    use_images,
+                    use_text,
+                    train_image_fn,
+                    test_image_fn,
+                    debug)
 
 plog("Starting model...")
 

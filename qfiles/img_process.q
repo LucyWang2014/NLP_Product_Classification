@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #PBS -l nodes=1:ppn=2:gpus=1
-#PBS -l walltime=10:00:00
-#PBS -l mem=6GB
-#PBS -N img_process_67_200k
+#PBS -l walltime=20:00:00
+#PBS -l mem=23GB
+#PBS -N img_process_200_500k
 #PBS -j oe
 
 THEANO_FLAGS='floatX=float32,device=gpu,cuda.root=/share/apps/cuda/6.5.12'
@@ -23,6 +23,7 @@ module load cudnn/6.5
 module load theano/20150721
 module load lasagne/20151007
 module load scikit-image/intel/20150129
+module load scikit-learn/intel/0.15.2
 
 export LD_LIBRARY_PATH=/share/apps/cudnn/6.5/lib64:$LD_LIBRARY_PATH
 export LIBRARY_PATH=/share/apps/cudnn/6.5/lib64:$LIBRARY_PATH

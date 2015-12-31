@@ -7,6 +7,7 @@ create_log(__file__)
 import pandas as pd
 import cPickle as pkl
 import os
+import numpy as np
 
 def get_indexes(fname):
     '''
@@ -72,11 +73,11 @@ def stitch_files(basename,idx_start=0,idx_finish=None):
         plog("loading %s..." %fname)
         with open(featuredir + fname,'rb') as f:
             df=pkl.load(f)
-            mm[iloc0:iloc1-1]=df.values.astype(np.float32)
+            mm[iloc0:iloc1]=df.values.astype(np.float32)
         plog("df shape: %s" %str(df.shape))
-        plog("mm shape: %s" %str(mm[iloc0:iloc1-1].shape))
+        plog("mm shape: %s" %str(mm[iloc0:iloc1].shape))
 
         
 
 if __name__ == '__main__':
-    stitch_files('train_image_features',0,200000)
+    stitch_files('train_image_features',0,625000)

@@ -59,7 +59,7 @@ def train_val_split(df,val_portion):
     assert valDF.shape[1]==trainDF.shape[1]
     return trainDF, valDF
 
-def get_brand_index(trainDF,valDF,testDF):
+def get_brand_index(datadir, trainDF,valDF,testDF):
     '''
     converts brand names to indexes.  Unknown brands get coded zero
     '''
@@ -73,6 +73,9 @@ def get_brand_index(trainDF,valDF,testDF):
     #add a zero for unknowns
     brands.insert(0, 'NA')
 
+    with open(datadir + 'brand_list.pkl','wb') as f:
+        pkl.dump(brands,f)
+
     trainDF['brand_num']=trainDF.brand.apply(apply_brand_index,args=[brands])
     valDF['brand_num']=valDF.brand.apply(apply_brand_index,args=[brands])
     testDF['brand_num']=testDF.brand.apply(apply_brand_index,args=[brands])
@@ -80,39 +83,21 @@ def get_brand_index(trainDF,valDF,testDF):
     trainDF['brand_num'].fillna(0, inplace=True)
     valDF['brand_num'].fillna(0, inplace=True)
     testDF['brand_num'].fillna(0, inplace=True)
-    return brands
 
-def build_brand_matrices(trainDF, valDF, testDF):
+def build_brand_matrix(encoder, df):
     '''
     one-hot encode brand indexes
     '''
-    brand_list = get_brand_index(trainDF,valDF,testDF)
-    with open(datadir + 'brand_list.pkl','wb') as f:
-        pkl.dump(brand_list,f)
+    plog("Building brand matrix...")
+    vect = np.reshape(df.brand_num.values,(-1,1))
+    brands_data = enc.fit_transform(vect).toarray()
+    return brands_data
 
-    plog("Building brand matrices...")
+def train_brand_encoder(trainDF):
     enc = OneHotEncoder()
     train_vect = np.reshape(trainDF.brand_num.values,(-1,1))
-    brands_train = enc.fit_transform(train_vect).toarray()
-
-    val_vect = np.reshape(valDF.brand_num.values,(-1,1))    
-    brands_val = enc.transform(val_vect).toarray()
-
-    test_vect = np.reshape(testDF.brand_num.values,(-1,1))
-    brands_test = enc.transform(test_vect).toarray()
-    return (brands_train, brands_val, brands_test)
-
-def build_text_matrix(datadir, dataset_name, tokenizer, df):
-    '''
-    use bag-of-words representation to convert description_clean into bag-of-words matrix
-    '''
-    plog("Building text matrices...")
-    text_matrix_path=datadir + dataset_name + '_text.mmap'
-
-    bow_matrix = bag_of_words.series_to_bag_of_words(df.description_clean,tokenizer,text_matrix_path,mode="binary")
-    return bow_matrix
-
-
+    enc.fit(train_vect).toarray()
+    return enc
 
 #Get text data
 def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
@@ -133,7 +118,6 @@ def build_text_matrices(datadir, tokenizer_path, trainDF, valDF, testDF):
     plog("bow_train type: %s" %type(bow_train))
     return (bow_train, bow_val, bow_test)
 
-#TODO: modify this to only load a batch of images at a time, from a csv or mmap instead of pickle
 def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
     '''
     load images from pkl files and convert to matrices
@@ -159,23 +143,37 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
 
     return (train_image_matrix, val_image_matrix, test_image_matrix)
 
-
-def get_targets(df):
+def n_values = get_targets(df,mmap_basename='y'):
     '''
-    Retrieve target labels and output as float32/int32
+    Retrieve target labels as int32 and store into a memmap
+    saves:
+        memmap of y values
+    returns:
+        n_values: number of distinct values in each y label
     '''
-    y1 = df.loc[:,'cat_1_num'].values.astype(np.int32)
-    y2 = df.loc[:,'cat_2_num'].values.astype(np.int32)
-    y3 = df.loc[:,'cat_3_num'].values.astype(np.int32)
-    return y1,y2,y3
+    y = df.loc[:,['cat_1_num','cat_2_num','cat_3_num']].values.astype(np.int32)
 
+    shape = (y.shape)
+    shape_str = "_".join(str(i) for i in shape)
+    map_name = datadir + mmap_basename + '_' + shape_str + '.mm'
+    mm = np.memmap(map_name, dtype='int32', mode='w+', shape=shape)
 
+    mm[0:shape[0],:] = y[0:shape[0],:]
 
-def conditional_hstack(brand,bow,image,dataset_name):
+    keys = ['y_1','y_2','y_3']
+    values = np.max(y,axis=0)
+    n_values = dict(zip(keys,values))
+    return n_values
+
+def merge_data(brand,bow,image):
     '''
     assumes 'brand' is present.
     if bag of words is not none, hstack it to brand
     if image is not None, hstack it to brand
+    args:
+        brand, bow, image: brand, bag-of-words, and image matrices
+    returns:
+        X: feature matrix for modeling
     '''
     if brand is not None:
         X=brand
@@ -183,38 +181,13 @@ def conditional_hstack(brand,bow,image,dataset_name):
             assert bow.shape[0]==X.shape[0]
             X = np.hstack((X,bow))
         else:
-            plog("Bag of words data missing from %s" %dataset_name)
+            plog("Bag of words data missing")
         if image is not None:
             assert image.shape[0]==X.shape[0]
             X = np.hstack((X,image))
         else:
-            plog("Image data missing from %s" %dataset_name)
-    return X
-
-def merge_data(bows,images,brands):
-    '''
-    merge together the datasets to be used in the model
-    args:
-        sets: list of datasets to be used
-    returns: 2D float32 numpyarrays
-    '''
-    #HACK: splitting None into 3
-    if bows is None:
-        bows = (None,None,None)
-    if images is None:
-        images= (None,None,None)
-
-    plog("Merging data...")
-    X_train = conditional_hstack(brands[0],bows[0],images[0],'train')
-    X_val = conditional_hstack(brands[1],bows[1],images[1],'val')
-    X_test = conditional_hstack(brands[2],bows[2],images[2],'test')
-
-    return X_train.astype(np.float32), X_val.astype(np.float32), X_test.astype(np.float32)
-
-def iterate_batches(trainDF,valDF,testDF, batch_size):
-    '''
-    iterate through 
-    '''
+            plog("Image data missing from")
+    return X.astype(np.float32)
 
 def prepDFs(datadir,
         train_samples=10000,
@@ -251,6 +224,74 @@ def prepDFs(datadir,
     testDF = shuffle_and_downsample(testDF,test_samples)
     return trainDF,testDF
 
+def get_features(datadir,df,image_path,mmap_basename,batch_size):
+    '''
+    from the initial trainDF, valDF, and testDF dataframes, 
+    extract brand, image, and text features in batches and combine into matrices
+    Then save matrices to disk using memmaps.
+
+    args:
+        datadir: you know by now
+        df: trainDF, valDF, or testDF
+        image_path: path to image feature file
+        mmap_basename: name of memory map file. Suffix with map's shape will be added later.
+        batch_size: size of batches for batch image_processing
+    returns:
+        none. Saves X feature matrix to disk. 
+    '''
+
+    #Load tokenizer
+    if use_text:
+        plog("Loading tokenizer...")
+        with open(datadir + 'tokenizer_5000.pkl') as f:
+            tokenizer=pkl.load(f)
+
+    #Change brand names to indexes
+    get_brand_index(datadir, trainDF ,valDF, testDF)
+
+    #Train brand encoder
+    brand_encoder = train_brand_encoder(trainDF)
+
+    for start_idx in range(0, df.shape[0], batch_size):
+        #indexes for this batch
+        id0=start_idx
+        id1=min(start_idx+batch_size,df.shape[0])
+
+        #Load text data
+        if use_text:
+            t0 = datetime.now()            
+            bow_data = bag_of_words.series_to_bag_of_words(batch.description_clean,tokenizer)
+            t1 = datetime.now()
+            plog("Time to load text: %s" %str(t1-t0))
+        else:
+            bow_data=None
+
+        #Load image data
+        if use_images:
+            t0 = datetime.now()
+            shape = (batch.shape[0],4096)
+            image_data = np.memmap(image_path, dtype='float32', mode='r+', shape=shape)
+            t1 = datetime.now()
+            plog("Time to load images: %s" %str(t1-t0))
+        else:
+            image_data=None
+
+        #Load brand data
+        brand_data = build_brand_matrix(brand_encoder, batch)
+
+        X = merge_data(bow_data,image_data,brand_data)
+
+        #on first batch, initialize memmap
+        if id0==0:
+            shape = (df.shape[0],X.shape[1])
+            shape_str = "_".join(str(i) for i in shape)
+            map_name = datadir + mmap_basename + '_' + shape_str + '.mm'
+            mm = np.memmap(map_name, dtype='float32', mode='w+', shape=shape)
+
+        #Write to memmap
+        mm[id0:id1]=X
+
+
 #TODO: don't return data, save it to a file.
 def main(datadir,
         train_samples=10000,
@@ -260,6 +301,7 @@ def main(datadir,
         use_text=True,
         train_image_fn='train_image_features_0_2500.pkl',
         test_image_fn='test_image_features_0_2500.pkl',
+        batch_size=1000
         debug=False):
     '''
     1. run train_val_split on training
@@ -273,7 +315,6 @@ def main(datadir,
     returns: X_train,y_train,X_val,y_val,X_test,y_test
     '''
 
-
     if(debug):
         trainpath = datadir + 'head_train_set.csv'
         testpath = datadir + 'head_test_set.csv'
@@ -281,6 +322,7 @@ def main(datadir,
         test_imagepath = datadir + 'test_image_features_0_2500.pkl'
         train_samples = 90
         test_samples = 90
+        batch_size=10
     else:
         trainpath = datadir + 'train_set.csv'
         testpath = datadir + 'test_set.csv'
@@ -289,83 +331,27 @@ def main(datadir,
 
     dstart=datetime.now()
 
-
     plog("Loading train csv...")
     raw_trainDF = pd.read_csv(trainpath,header = 0, index_col = 0,low_memory = False)
     plog("Loading test csv...")
     raw_testDF = pd.read_csv(testpath,header = 0, index_col = 0,low_memory = False)
 
-    if use_text:
-        plog("Loading tokenizer...")
-        with open(datadir + 'tokenizer_5000.pkl') as f:
-            tokenizer=pkl.load(f)
+    trainDF_ = shuffle_and_downsample(raw_trainDF,train_samples)
+    testDF = shuffle_and_downsample(raw_testDF,test_samples)
+    trainDF,full_valDF = train_val_split(trainDF_,val_portion)
 
-    full_trainDF = shuffle_and_downsample(raw_trainDF,train_samples)
-    full_testDF = shuffle_and_downsample(raw_testDF,test_samples)
-    full_trainDF,full_valDF = train_val_split(full_trainDF,val_portion)
+    #Prepare targets.  Get n_values from training
+    n_values = get_targets(trainDF,'y_train')
+    get_targets(valDF,'y_val')
+    get_targets(testDF,'y_test')
 
-    #TODO: cut trainDF, valDF, and testDF into batches
-    #TODO: rewrite all of this to operate on train, val, then test, sequentially
-    #START HERE
-    #then run the following:
-    for batch in iterate_batches(full_trainDF, batch_size):
-        trainDF = batch
-
-        #Load text data
-        if use_text:
-            t0 = datetime.now()            
-            bow_train = build_text_matrix(tokenizer,trainDF)
-            t1 = datetime.now()
-            plog("Time to load text: %s" %str(t1-t0))
-        else:
-            bow_data=None
-
-
-
-    #Load text data
-    if use_text:
-        t0 = datetime.now()
-        bow_data=build_text_matrices(datadir, 'tokenizer_5000.pkl', trainDF, valDF, testDF)
-        t1 = datetime.now()
-        plog("Time to load text: %s" %str(t1-t0))
-    else:
-        bow_data=None
-
-    #Load image data
-    
-    if use_images:
-        t0 = datetime.now()
-        image_data = get_image_matrices(train_imagepath,test_imagepath,trainDF, valDF, testDF)
-        t1 = datetime.now()
-        plog("Time to load images: %s" %str(t1-t0))
-    else:
-        image_data=None
-
-    #Load targets
-    y1_train,y2_train,y3_train=get_targets(trainDF)
-    y1_val,y2_val,y3_val=get_targets(valDF)
-    y1_test,y2_test,y3_test=get_targets(testDF)
-
-    #Load brand data
-    brand_data = build_brand_matrices(trainDF, valDF, testDF)
-
-    X_train,X_val,X_test = merge_data(bow_data,image_data,brand_data)
-
-    train_data = X_train, y1_train, y2_train, y3_train
-    val_data = X_val, y1_val, y2_val, y3_val
-    test_data = X_test, y1_test, y2_test, y3_test
-
-    keys = ['y_1','y_2','y_3']
-    values = [max(d)+1 for d in train_data[1:]]
-    n_values = dict(zip(keys,values))
-    data = (train_data, val_data, test_data)
-
-    plog("Data loaded.  Saving to %s" %outpath)
-    with open(outpath,'wb') as f:
-        pkl.dump((data,n_values),f)
+    #Prepare features
+    get_features(datadir,train_df,train_imagepath,mmap_basename='X_train',batch_size=batch_size)
+    get_features(datadir,val_df,val_imagepath,mmap_basename='X_val',batch_size=batch_size)
+    get_features(datadir,test_df,test_imagepath,mmap_basename='X_test',batch_size=batch_size)
 
     dfin = datetime.now()
-    plog("Data loading time: %s" %(dfin-dstart))
+    plog("Data prep time: %s" %(dfin-dstart))
 
 
 if __name__ == '__main__':

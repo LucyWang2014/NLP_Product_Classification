@@ -27,8 +27,7 @@ def stitch_files(basename,idx_start=0,idx_finish=None):
         none.  saves pickle of images stitched together
         
     '''
-    #datadir = '../data/'
-    datadir = '/scratch/cdg356/spring/data/'
+    datadir = '../data/'
     featuredir = datadir+basename+'/'
     
     #Get list of indexes
@@ -52,18 +51,6 @@ def stitch_files(basename,idx_start=0,idx_finish=None):
     for i in range(len(iloc0_list)-1):
         assert iloc0_list[i+1]==iloc1_list[i]
 
-    #Load files
-    for i,iloc0 in enumerate(iloc0_list):
-        iloc1=iloc1_list[i]
-        fname = basename + "_%i_%i.pkl" %(iloc0,iloc1)
-        plog("loading %s..." %fname)
-        with open(featuredir + fname,'rb') as f:
-            if i==0:
-                df=pkl.load(f)
-            else:
-                df2=pkl.load(f)
-                df=pd.concat([df,df2])
-        plog("df shape: %s" %str(df.shape))
     max_index = max(iloc1_list)
 
     # A couple sanity checks
@@ -71,12 +58,24 @@ def stitch_files(basename,idx_start=0,idx_finish=None):
     if idx_finish is not None:
         assert idx_finish==max_index
     assert idx_start==iloc0_list[0]
-    
-    outname = datadir + basename + '_%i_%i.pkl'%(idx_start,max_index)
 
-    plog("writing to %s..." %outname)
-    with open(outname,'wb') as f:
-        pkl.dump(df,f)
+    #Initialize memmap
+    shape = (max_index+1,4096)
+    shape_str = "_".join(str(i) for i in shape)
+    map_name = datadir + basename + '_' + shape_str + '.mm'
+    mm = np.memmap(map_name, dtype='float32', mode='w+', shape=shape)
+
+    #Load files
+    for i,iloc0 in enumerate(iloc0_list):
+        iloc1=iloc1_list[i]
+        fname = basename + "_%i_%i.pkl" %(iloc0,iloc1)
+        plog("loading %s..." %fname)
+        with open(featuredir + fname,'rb') as f:
+            df=pkl.load(f)
+            mm[iloc0:iloc1-1]=df.values.astype(np.float32)
+        plog("df shape: %s" %str(df.shape))
+        plog("mm shape: %s" %str(mm[iloc0:iloc1-1].shape))
+
         
 
 if __name__ == '__main__':

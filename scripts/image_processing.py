@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #TODO: 
-#batch these up into batches of 256 or 512 images
+#batch these up into batches of 256 or 512 images, save to memmap
 from utils import create_log,plog
 create_log(__file__)
 
@@ -97,7 +97,7 @@ def prep_for_vgg(url,i,dataset,datadir,width=224,filetype="jpg"):
         im=floatX(im[np.newaxis])
     return im
 
-#TODO: modify so it adds to a csv instead of saving a pickle
+#TODO: modify so it adds to a memmap instead of saving a pickle
 def batch_extract_features(batch_series,dataset,datadir,width,filetype):
     '''
     take batch_series and return dataframe of image features with shape (batch_series.shape[0],4096)
@@ -133,25 +133,28 @@ def get_selected_image_features(df,
                                 iloc0,
                                 iloc1,
                                 save_freq,
-                                out_pickle_name='image_features.pkl',
+                                mmap_basename='train_image_features',
                                 batch_size=256,
                                 width=224,
                                 filetype='jpg'):
     '''
     for a given index range, download and resize the images,
-    then save to directory
+    then save to memmap
 
     args:
         df: dataframe where image urls are
         iloc0: int or None. first iloc of range of images to download
-        iloc1: int or None. last iloc of range of images to download
+        iloc1: int or None. last iloc+1 of range of images to download
         save_freq: how many batches before saving
-        out_pickle_name: name of outfile
+        mmap_basename: name of memmap outfile
         batch_size: rows per batch
         dataset: string 'train' or 'test' or other identifier
 
     returns:
         none
+
+    saves:
+        memmap of matrices
     '''
     plog("Beginning feature extraction...")
     assert iloc0<=df.shape[0]
@@ -160,7 +163,15 @@ def get_selected_image_features(df,
     iloc=iloc0
     prev_iloc = iloc0
     batch_num=0
+    indexes = []
     featureDF = pd.DataFrame()
+
+    #initialize memmap
+    #shape of the image memmap
+    shape = (df.shape[0],4096)
+    shape_str = "_".join(str(i) for i in shape)
+    map_name = datadir + mmap_basename + '_' + shape_str + '.mm'
+    mm = np.memmap(map_name, dtype='float32', mode='w+', shape=shape)
     
     for batch in iterate_minibatches(image_urls,batch_size):
         plog("extracting image features for batch %i, iloc %i" %(batch_num,iloc))
@@ -172,9 +183,10 @@ def get_selected_image_features(df,
         
         if iloc>iloc0 and (batch_num%save_freq==0 or iloc>=iloc1-1):
             plog("Saving from image iloc %i to image iloc %i" %(prev_iloc,iloc))
-            #Append to csv here
-            with open('csv_fn.csv','a') as outf:
-                featureDF.to_csv(outf,header=False)
+
+            #Append to memmap here
+            mm[prev_iloc:iloc,:] = featureDF.values.astype(np.float32)
+            indexes+=list(featureDF.index)
 
             #with open(datadir+out_pickle_name + '_' + str(prev_iloc) + '_' + str(iloc)+'.pkl','wb') as outf:
             #    pkl.dump(featureDF,outf)  
@@ -182,6 +194,9 @@ def get_selected_image_features(df,
 
             #reset featureDF to save memory
             featureDF = pd.DataFrame()
+
+    assert len(indexes)==len(df.index), "Indexes different length"
+    assert min(indexes==df.index)==True, "Indexes don't line up"
 
 
 

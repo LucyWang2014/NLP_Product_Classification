@@ -19,6 +19,11 @@ import lasagne
 
 import pdb
 
+def get_data(datadir):
+    train_data = X_train, y1_train, y2_train, y3_train
+    val_data = X_val, y1_val, y2_val, y3_val
+    test_data = X_test, y1_test, y2_test, y3_test    
+
 def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=np.float32(.2),
     drop_hidden=np.float32(.5), layer_shape = None, num_units = None):
     '''

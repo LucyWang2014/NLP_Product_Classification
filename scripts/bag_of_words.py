@@ -33,7 +33,7 @@ def build_tokenizer(series,nb_words,tok_path):
         pkl.dump(tok,outf)
     return tok
     
-def series_to_bag_of_words(series,tokenizer,text_matrix_path,mode="binary"):
+def series_to_bag_of_words(series,tokenizer,mode="binary"):
     '''
     args:
         series: pandas series made up of strings
@@ -46,9 +46,8 @@ def series_to_bag_of_words(series,tokenizer,text_matrix_path,mode="binary"):
     texts = series
     idx = series.index
     text_matrix = tokenizer.texts_to_matrix(texts,mode).astype(np.float32)
-    with open(text_matrix_path,'wb') as outf:
-        pkl.dump(text_matrix,outf)
-    #return pd.DataFrame(text_matrix, index=series.index)
+    #with open(text_matrix_path,'wb') as outf:
+    #    pkl.dump(text_matrix,outf)
     assert text_matrix.shape==(len(idx),tokenizer.nb_words)
     return text_matrix
 

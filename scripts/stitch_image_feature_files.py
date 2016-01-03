@@ -87,4 +87,4 @@ def stitch_files(basename,idx_start=0,idx_finish=None):
         
 
 if __name__ == '__main__':
-    stitch_files('train_image_features',0,625000)
+    stitch_files('test_image_features',0,None)

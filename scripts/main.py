@@ -39,8 +39,9 @@ options_dict = {
     'val_portion': 0.1,
     'use_images': use_images, # T, F
     'use_text': use_text, # T, F
-    'train_image_fn': 'train_image_features_0_100000.pkl',
-    'test_image_fn': 'test_image_features_0_100000.pkl',
+    'train_image_fn': 'train_image_features_625001_4096.mm',
+    'test_image_fn': 'test_image_features_100001_4096.pkl',
+    'batch_size': 10000,
     'debug': False,
 
     #MODEL PARAMS,
@@ -49,7 +50,7 @@ options_dict = {
     'width': 256,
     'drop_in': .2,
     'drop_hid': .5,
-    'batch_size': 256, 
+    'minibatch_size': 256, 
     'learning_rate': 0.01,
     'valid_freq': 1000, #1000
     'reload_model': None,
@@ -65,6 +66,7 @@ log_time = start_time.strftime('%Y%m%d_%H%M%S')
 if not os.path.exists('../results/'):
     os.makedirs('../results/')
 
+#Set image/text strings for results path
 if use_images:
     image_str='images_'
 else:
@@ -78,13 +80,13 @@ else:
 sample_str = str(train_samples/1000)+'k_'
 results_path = '../results/results_%s%s%s%s.npz' %(sample_str,image_str,text_str,log_time)
 
-print train_samples
+plog("Num. training samples: %i" %train_samples)
 test_samples = int(0.1*train_samples)
 
 dstart=datetime.now()
 plog("Checking to see if prepped data already available...")
 #TODO: change this to check for the appropriate train, val, test sets
-data_path = datadir + 'model_data_%i_%r_%s_%s.pkl'%(train_samples,val_portion,use_images,use_text)
+data_path = datadir + 'model_data_%s%s%s%r.mm'%(image_str,text_str,sample_str,val_portion)
 if os.path.exists(outpath):
     plog("Data found. Moving on to models.py")
 else:
@@ -98,8 +100,9 @@ else:
                     use_text,
                     train_image_fn,
                     test_image_fn,
+                    batch_size,
                     debug)
-
+'''
 plog("Starting model...")
 
 params, preds = models.train_simple_model(data,
@@ -109,10 +112,11 @@ params, preds = models.train_simple_model(data,
         width,
         drop_in,
         drop_hid,
-        batch_size,
+        minibatch_size,
         learning_rate,
         valid_freq,
         results_path,
         options_dict,
         reload_model,
         num_targets)
+'''

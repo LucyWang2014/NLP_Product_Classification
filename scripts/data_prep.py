@@ -315,9 +315,9 @@ def main(datadir,
         val_portion=0.1,
         use_images=True,
         use_text=True,
-        train_image_fn='train_image_features_0_2500.pkl',
-        test_image_fn='test_image_features_0_2500.pkl',
-        batch_size=1000
+        train_image_fn='train_image_features_625001_4096.mm',
+        test_image_fn='test_image_features_100001_4096.mm',
+        batch_size=10000,
         debug=False):
     '''
     1. run train_val_split on training
@@ -334,17 +334,16 @@ def main(datadir,
     if(debug):
         trainpath = datadir + 'head_train_set.csv'
         testpath = datadir + 'head_test_set.csv'
-        train_imagepath = datadir + 'train_image_features_0_2500.pkl'
-        test_imagepath = datadir + 'test_image_features_0_2500.pkl'
         train_samples = 90
         test_samples = 90
         batch_size=10
     else:
         trainpath = datadir + 'train_set.csv'
         testpath = datadir + 'test_set.csv'
-        train_imagepath = datadir + train_image_fn
-        test_imagepath = datadir + test_image_fn
 
+
+    train_imagepath = datadir + train_image_fn
+    test_imagepath = datadir + test_image_fn
     dstart=datetime.now()
 
     #Load, shuffle, and split the train and test sets
@@ -392,6 +391,20 @@ if __name__ == '__main__':
     home = os.path.join(os.path.dirname(__file__),'..')
     datadir = os.path.join(home,'data') + '/'
 
+
+    data_prep.main(datadir,
+        train_samples=625001,
+        test_samples=100000,
+        val_portion=0.1,
+        use_images=True,
+        use_text=True,
+        train_image_fn='train_image_features_625001_4096.mm',
+        test_image_fn='test_image_features_100001_4096.mm',
+        batch_size=10000,
+        debug=True):
+
+
+'''
     trainDF,testDF = prepDFs(datadir,
                             train_samples=None,
                             test_samples=100,
@@ -417,3 +430,4 @@ if __name__ == '__main__':
                                 batch_size,
                                 width=224,
                                 filetype='jpg')
+'''

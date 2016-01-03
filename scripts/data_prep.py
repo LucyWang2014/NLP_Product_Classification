@@ -166,7 +166,7 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
 
     return (train_image_matrix, val_image_matrix, test_image_matrix)
 
-def n_values = get_targets(df,mmap_basename='y'):
+def get_targets(df,mmap_basename='y'):
     '''
     Retrieve target labels as int32 and store into a memmap
     saves:
@@ -392,7 +392,7 @@ if __name__ == '__main__':
     datadir = os.path.join(home,'data') + '/'
 
 
-    data_prep.main(datadir,
+    main(datadir,
         train_samples=625001,
         test_samples=100000,
         val_portion=0.1,
@@ -401,7 +401,7 @@ if __name__ == '__main__':
         train_image_fn='train_image_features_625001_4096.mm',
         test_image_fn='test_image_features_100001_4096.mm',
         batch_size=10000,
-        debug=True):
+        debug=True)
 
 
 '''

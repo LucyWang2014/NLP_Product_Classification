@@ -309,7 +309,6 @@ def get_features(datadir,df,use_text,use_images,tokenizer,image_mm,mmap_basename
         batch_num+=1
 
 
-#TODO: don't return data, save it to a file.
 def main(datadir,
         train_samples=10000,
         test_samples=1000,

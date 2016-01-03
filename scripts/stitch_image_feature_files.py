@@ -37,10 +37,16 @@ def stitch_files(basename,idx_start=0,idx_finish=None):
     for root, dirs, files in os.walk(featuredir):
         for fname in files:
             idx_range = get_indexes(fname)
-            if idx_range[0] is not None and idx_range[1] is not None:
-                if idx_range[0]>=idx_start and idx_range[1]<=idx_finish:
+            if idx_range[0] is not None:
+                if idx_range[0]>=idx_start:
                     iloc0_list.append(idx_range[0])
-                    iloc1_list.append(idx_range[1])
+            else:
+                iloc0_list.append(idx_range[0])
+            if idx_range[1] is not None:
+                if idx_range[1]<=idx_finish:
+                iloc1_list.append(idx_range[1])
+            else:
+                iloc1_list.append(idx_range[1])
     iloc0_list.sort()
     iloc1_list.sort()
 

@@ -288,7 +288,7 @@ def get_features(datadir,df,use_text,use_images,tokenizer,brand_encoder,image_mm
         #Load image data
         if use_images:
             t0 = datetime.now()
-            image_data = image_mm[id0,id1]
+            image_data = image_mm[id0:id1]
             t1 = datetime.now()
             plog("Time to load images: %s" %str(t1-t0))
         else:
@@ -400,10 +400,10 @@ if __name__ == '__main__':
         train_samples=625001,
         test_samples=100000,
         val_portion=0.1,
-        use_images=False,
+        use_images=True,
         use_text=True,
-        train_image_fn='train_image_features_625001_4096.mm',
-        test_image_fn='test_image_features_100001_4096.mm',
+        train_image_fn='head_train_1000_4096.mm',
+        test_image_fn='head_test_1000_4096.mm',
         batch_size=10000,
         debug=True)
 

@@ -99,13 +99,13 @@ def get_brand_index(datadir, trainDF,valDF,testDF):
     with open(datadir + 'brand_list.pkl','wb') as f:
         pkl.dump(brands,f)
 
-    trainDF['brand_num']=trainDF.brand.apply(apply_brand_index,args=[brands])
-    valDF['brand_num']=valDF.brand.apply(apply_brand_index,args=[brands])
-    testDF['brand_num']=testDF.brand.apply(apply_brand_index,args=[brands])
+    trainDF.loc[:,'brand_num']=trainDF.brand.apply(apply_brand_index,args=[brands])
+    valDF.loc[:,'brand_num']=valDF.brand.apply(apply_brand_index,args=[brands])
+    testDF.loc[:,'brand_num']=testDF.brand.apply(apply_brand_index,args=[brands])
     
-    trainDF['brand_num'].fillna(0, inplace=True)
-    valDF['brand_num'].fillna(0, inplace=True)
-    testDF['brand_num'].fillna(0, inplace=True)
+    trainDF.brand_num.fillna(0, inplace=True)
+    valDF.brand_num.fillna(0, inplace=True)
+    testDF.brand_num.fillna(0, inplace=True)
 
 def build_brand_matrix(encoder, df):
     '''
@@ -113,13 +113,13 @@ def build_brand_matrix(encoder, df):
     '''
     plog("Building brand matrix...")
     vect = np.reshape(df.brand_num.values,(-1,1))
-    brands_data = enc.fit_transform(vect).toarray()
+    brands_data = encoder.transform(vect).toarray()
     return brands_data
 
 def train_brand_encoder(trainDF):
     enc = OneHotEncoder()
     train_vect = np.reshape(trainDF.brand_num.values,(-1,1))
-    enc.fit(train_vect).toarray()
+    enc.fit(train_vect)
     return enc
 
 #Get text data
@@ -166,7 +166,7 @@ def get_image_matrices(train_imagepath,test_imagepath, trainDF, valDF, testDF):
 
     return (train_image_matrix, val_image_matrix, test_image_matrix)
 
-def n_values = get_targets(df,mmap_basename='y'):
+def get_targets(df,mmap_basename='y'):
     '''
     Retrieve target labels as int32 and store into a memmap
     saves:
@@ -188,7 +188,7 @@ def n_values = get_targets(df,mmap_basename='y'):
     n_values = dict(zip(keys,values))
     return n_values
 
-def merge_data(brand,bow,image):
+def merge_data(brand,image,bow):
     '''
     assumes 'brand' is present.
     if bag of words is not none, hstack it to brand
@@ -247,7 +247,7 @@ def prepDFs(datadir,
     testDF = shuffle_and_downsample(testDF,test_samples)
     return trainDF,testDF
 
-def get_features(datadir,df,use_text,use_images,tokenizer,image_mm,mmap_basename,batch_size):
+def get_features(datadir,df,use_text,use_images,tokenizer,brand_encoder,image_mm,mmap_basename,batch_size):
     '''
     from the initial trainDF, valDF, and testDF dataframes, 
     extract brand, image, and text features in batches and combine into matrices
@@ -256,9 +256,10 @@ def get_features(datadir,df,use_text,use_images,tokenizer,image_mm,mmap_basename
     args:
         datadir: you know by now
         df: trainDF, valDF, or testDF
-        use_text:
-        use_images:
-        tokenizer:
+        use_text: boolean
+        use_images: boolean
+        tokenizer: pretrained text tokenizer.  trained using bag_of_words.py
+        brand_encoder: OneHotEncoder for brand features
         image_path: path to image feature file
         mmap_basename: name of memory map file. Suffix with map's shape will be added later.
         batch_size: size of batches for batch image_processing
@@ -266,12 +267,14 @@ def get_features(datadir,df,use_text,use_images,tokenizer,image_mm,mmap_basename
         none. Saves X feature matrix to disk. 
     '''
 
+    batch_num = 0
     for start_idx in range(0, df.shape[0], batch_size):
-        batch_num = 0
+
         plog("Prepping data for batch %i, starting at index %i" %(batch_num, start_idx))
         #indexes for this batch
         id0=start_idx
         id1=min(start_idx+batch_size,df.shape[0])
+        batch = df.iloc[id0:id1,:]
 
         #Load text data
         if use_text:
@@ -294,7 +297,7 @@ def get_features(datadir,df,use_text,use_images,tokenizer,image_mm,mmap_basename
         #Load brand data
         brand_data = build_brand_matrix(brand_encoder, batch)
 
-        X = merge_data(bow_data,image_data,brand_data)
+        X = merge_data(brand_data,image_data,bow_data)
 
         #on first batch, initialize memmap
         if id0==0:
@@ -307,6 +310,7 @@ def get_features(datadir,df,use_text,use_images,tokenizer,image_mm,mmap_basename
         mm[id0:id1]=X
 
         batch_num+=1
+    plog("Finished getting features. Shape of final memmap: %s" %str(shape))
 
 
 def main(datadir,
@@ -367,7 +371,7 @@ def main(datadir,
     #Load tokenizer
     if use_text:
         plog("Loading tokenizer...")
-        with open(datadir + 'tokenizer_5000.pkl') as f:
+        with open('tokenizer_5000.pkl') as f:
             tokenizer=pkl.load(f)
     else:
         tokenizer = None
@@ -379,9 +383,9 @@ def main(datadir,
     brand_encoder = train_brand_encoder(trainDF)
 
     #Prepare features
-    get_features(datadir,trainDF,use_text,use_images,tokenizer,train_image_mm,mmap_basename='X_train',batch_size=batch_size)
-    get_features(datadir,valDF,use_text,use_images,tokenizer,val_image_mm,mmap_basename='X_val',batch_size=batch_size)
-    get_features(datadir,testDF,use_text,use_images,tokenizer,test_image_mm,mmap_basename='X_test',batch_size=batch_size)
+    get_features(datadir,trainDF,use_text,use_images,tokenizer,brand_encoder,train_image_mm,mmap_basename='X_train',batch_size=batch_size)
+    get_features(datadir,valDF,use_text,use_images,tokenizer,brand_encoder,val_image_mm,mmap_basename='X_val',batch_size=batch_size)
+    get_features(datadir,testDF,use_text,use_images,tokenizer,brand_encoder,test_image_mm,mmap_basename='X_test',batch_size=batch_size)
 
     dfin = datetime.now()
     plog("Data prep time: %s" %(dfin-dstart))
@@ -392,16 +396,16 @@ if __name__ == '__main__':
     datadir = os.path.join(home,'data') + '/'
 
 
-    data_prep.main(datadir,
+    main(datadir,
         train_samples=625001,
         test_samples=100000,
         val_portion=0.1,
-        use_images=True,
+        use_images=False,
         use_text=True,
-        train_image_fn='train_image_features_625001_4096.mm',
-        test_image_fn='test_image_features_100001_4096.mm',
+        train_image_fn='head_train_1000_4096.mm',
+        test_image_fn='head_test_1000_4096.mm',
         batch_size=10000,
-        debug=True):
+        debug=True)
 
 
 '''

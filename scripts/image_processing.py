@@ -1,7 +1,7 @@
 # coding: utf-8
 
 #TODO: 
-#batch these up into batches of 256 or 512 images, save to memmap
+#debug the rewrite
 from utils import create_log,plog
 create_log(__file__)
 

@@ -383,9 +383,9 @@ def main(datadir,
     brand_encoder = train_brand_encoder(trainDF)
 
     #Prepare features
-    get_features(datadir,trainDF,use_text,use_images,tokenizer,brand_encoder,train_image_mm,mmap_basename='X_train',batch_size=batch_size)
-    get_features(datadir,valDF,use_text,use_images,tokenizer,brand_encoder,val_image_mm,mmap_basename='X_val',batch_size=batch_size)
-    get_features(datadir,testDF,use_text,use_images,tokenizer,brand_encoder,test_image_mm,mmap_basename='X_test',batch_size=batch_size)
+    get_features(datadir,trainDF,use_text,use_images,tokenizer,brand_encoder,train_image_mm, mmap_basename='X_train',batch_size=batch_size)
+    get_features(datadir,valDF,use_text,use_images,tokenizer,brand_encoder,val_image_mm, mmap_basename='X_val',batch_size=batch_size)
+    get_features(datadir,testDF,use_text,use_images,tokenizer,brand_encoder,test_image_mm, mmap_basename='X_test',batch_size=batch_size)
 
     dfin = datetime.now()
     plog("Data prep time: %s" %(dfin-dstart))
@@ -402,8 +402,8 @@ if __name__ == '__main__':
         val_portion=0.1,
         use_images=False,
         use_text=True,
-        train_image_fn='head_train_1000_4096.mm',
-        test_image_fn='head_test_1000_4096.mm',
+        train_image_fn='train_image_features_625001_4096.mm',
+        test_image_fn='test_image_features_100001_4096.mm',
         batch_size=10000,
         debug=True)
 

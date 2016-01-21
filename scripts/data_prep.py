@@ -52,8 +52,8 @@ def train_val_split(df,val_portion):
     assert val_portion<1 and val_portion>0
     val_samples = int(df.shape[0]*val_portion)
     train_samples = df.shape[0] - val_samples
-    trainDF = df.iloc[:train_samples,:]
-    valDF = df.iloc[train_samples:train_samples+val_samples,:]
+    trainDF = df.iloc[:train_samples,:].copy()
+    valDF = df.iloc[train_samples:train_samples+val_samples,:].copy()
 
     assert valDF.shape[0] + trainDF.shape[0] == df.shape[0]
     assert valDF.shape[1]==trainDF.shape[1]
@@ -86,6 +86,8 @@ def get_brand_index(datadir, trainDF,valDF,testDF):
     '''
     converts brand names to indexes.  Unknown brands get coded zero
     '''
+    plog("Getting brand index...")
+
     def apply_brand_index(brand,brand_list):
         if brand in brand_list:
             return brand_list.index(brand)
@@ -111,12 +113,12 @@ def build_brand_matrix(encoder, df):
     '''
     one-hot encode brand indexes
     '''
-    plog("Building brand matrix...")
     vect = np.reshape(df.brand_num.values,(-1,1))
     brands_data = encoder.transform(vect).toarray()
     return brands_data
 
 def train_brand_encoder(trainDF):
+    plog("Training brand encoder...")
     enc = OneHotEncoder()
     train_vect = np.reshape(trainDF.brand_num.values,(-1,1))
     enc.fit(train_vect)
@@ -268,6 +270,7 @@ def get_features(datadir,df,use_text,use_images,tokenizer,brand_encoder,image_mm
     '''
 
     batch_num = 0
+    t0 = datetime.now()
     for start_idx in range(0, df.shape[0], batch_size):
 
         plog("Prepping data for batch %i, starting at index %i" %(batch_num, start_idx))
@@ -278,19 +281,13 @@ def get_features(datadir,df,use_text,use_images,tokenizer,brand_encoder,image_mm
 
         #Load text data
         if use_text:
-            t0 = datetime.now()            
             bow_data = bag_of_words.series_to_bag_of_words(batch.description_clean,tokenizer)
-            t1 = datetime.now()
-            plog("Time to load text: %s" %str(t1-t0))
         else:
             bow_data=None
 
         #Load image data
         if use_images:
-            t0 = datetime.now()
             image_data = image_mm[id0:id1]
-            t1 = datetime.now()
-            plog("Time to load images: %s" %str(t1-t0))
         else:
             image_data=None
 
@@ -311,6 +308,9 @@ def get_features(datadir,df,use_text,use_images,tokenizer,brand_encoder,image_mm
 
         batch_num+=1
     plog("Finished getting features. Shape of final memmap: %s" %str(shape))
+    t1 = datetime.now()
+    plog("Time to load data: %s" %str(t1-t0))
+
 
 
 def main(datadir,
@@ -358,6 +358,7 @@ def main(datadir,
     trainDF_ = shuffle_and_downsample(raw_trainDF,train_samples)
     testDF = shuffle_and_downsample(raw_testDF,test_samples)
     trainDF,valDF = train_val_split(trainDF_,val_portion)
+    trainDF_ = None #forget about trainDF_
 
     #Load image memmaps
     train_image_mm, val_image_mm = image_train_val_split(trainDF,valDF,train_imagepath)

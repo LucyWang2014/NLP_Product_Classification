@@ -405,8 +405,8 @@ if __name__ == '__main__':
         val_portion=0.1,
         use_images=True,
         use_text=True,
-        train_image_fn='head_train_1000_4096.mm',
-        test_image_fn='head_test_1000_4096.mm',
+        train_image_fn='train_image_features_625001_4096.mm',
+        test_image_fn='test_image_features_100001_4096.mm',
         batch_size=10000,
         debug=True)
 

@@ -301,6 +301,7 @@ def get_features(datadir,df,use_text,use_images,tokenizer,brand_encoder,image_mm
             shape = (df.shape[0],X.shape[1])
             shape_str = "_".join(str(i) for i in shape)
             map_name = datadir + mmap_basename + '_' + shape_str + '.mm'
+            plog("Saving to memmap at %s" %map_name)
             mm = np.memmap(map_name, dtype='float32', mode='w+', shape=shape)
 
         #Write to memmap
@@ -332,7 +333,8 @@ def main(datadir,
         a. extract image data
     4. merge datasets
 
-    returns: X_train,y_train,X_val,y_val,X_test,y_test
+    saves: X_train,y_train,X_val,y_val,X_test,y_test
+    returns: none
     '''
 
     if(debug):

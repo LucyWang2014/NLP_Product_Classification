@@ -19,10 +19,14 @@ import lasagne
 
 import pdb
 
-def get_data(datadir):
-    train_data = X_train, y1_train, y2_train, y3_train
-    val_data = X_val, y1_val, y2_val, y3_val
-    test_data = X_test, y1_test, y2_test, y3_test    
+def get_mm_shape(mmpath):
+    '''returns the last two terms of the filename, assuming they are separated by underscores _'''
+    str_shape = mmpath.split('/')[-1].split('.')[0].split('_')[-2:]
+    return tuple(int(i) for i in str_shape)
+
+def read_memmap(mmpath,dtype):
+    shape = get_mm_shape(mmpath)
+    return np.memmap(mmpath, dtype=dtype, mode='r', shape=shape)
 
 def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=np.float32(.2),
     drop_hidden=np.float32(.5), layer_shape = None, num_units = None):
@@ -75,21 +79,25 @@ def build_custom_mlp(input_var=None, depth=10, width=256, drop_input=np.float32(
 # them to GPU at once for slightly improved performance. This would involve
 # several changes in the main program, though, and is not demonstrated here.
 
-#TODO: modify to load data from here
-def iterate_minibatches(data, batchsize, shuffle=False):
-    inputs = data[0]
-    targets = data[1:4]
-
-    assert len(inputs) == len(targets[0])
-    if shuffle:
-        indices = np.arange(len(inputs))
-        np.random.shuffle(indices)
-    for start_idx in range(0, len(inputs) - batchsize + 1, batchsize):
-        if shuffle:
-            excerpt = indices[start_idx:start_idx + batchsize]
-        else:
-            excerpt = slice(start_idx, start_idx + batchsize)
-        yield inputs[excerpt], [y[excerpt] for y in targets]
+def iterate_minibatches(X_mm,y_mm, batchsize):
+    '''
+    iterate through batches by loading the batch from the memmap,
+    then yielding the corresponding inputs and targets
+    
+    inputs:
+        X_mm: memmap for inputs
+        y_mm: memmap for targets
+        batchsize: how many rows to process at a time.
+        
+    returns:
+        batch of X_mm
+        batch of y_mm in list form.
+    '''
+    assert X_mm.shape[0]==y_mm.shape[0]
+    
+    for start_idx in range(0, X_mm.shape[0] - batchsize + 1, batchsize):
+        excerpt = slice(start_idx, start_idx + batchsize)
+        yield X_mm[excerpt], [y_mm[excerpt,i] for i in range(y_mm.shape[1])]
 
 def get_all_params(network):
     params = []
@@ -100,9 +108,17 @@ def get_all_params(network):
 
     return params
 
-#CG Use this model.  Must be all 3 right now. 
-def train_simple_model(data = None,
-    n_values = None,
+def get_n_values(y_mm):
+    n_values = np.max(y_mm,axis=0)
+    n_values = [[n] for n in n_values] #weird conversion to make it work in the mlp
+    return n_values
+
+def train_simple_model(X_train_mmpath=None,
+    y_train_mmpath=None,
+    X_val_mmpath=None,
+    y_val_mmpath=None,
+    X_test_mmpath=None,
+    y_test_mmpath=None,
     num_epochs=5,
     depth = 10,
     width = 256,
@@ -116,19 +132,29 @@ def train_simple_model(data = None,
     reload_model = None,
     num_targets = 3):
 
-    #TODO: eliminate data from this function.  Instead refer to a filename for data.
-    #TODO: Rewrite iterate_minibatch to iterate through a file. 
-        #Either use numpy's mmap or csv
-    #TODO: load the first line of said file to get layer_shape
-    train, valid, test = data
+    '''
+    Train MLP
+
+    args:
+
+    '''
+
+    X_train_mm = read_memmap(X_train_mmpath,'float32')
+    X_val_mm = read_memmap(X_val_mmpath,'float32')
+    X_test_mm = read_memmap(X_test_mmpath,'float32')
+    y_train_mm = read_memmap(y_train_mmpath,'int32')
+    y_val_mm = read_memmap(y_val_mmpath,'int32')
+    y_test_mm = read_memmap(y_test_mmpath,'int32')
+
+    n_values = get_n_values(y_train_mm)
 
     #X width, so the model knows how wide to make the first layer
-    layer_shape = train[0].shape[1] 
+    layer_shape = get_mm_shape(X_train_mmpath)[1]
 
     # Prepare Theano variables for inputs and target
     input_var = T.matrix('inputs',dtype='float32')
 
-    #CG: num_targets is 1 or 3.  int64 fine because it goes into output
+    #num_targets is 1 or 3.
     target_var = []
     for i in range(num_targets):
         target_var.append(T.vector('target_%s' % i,dtype = 'int32'))
@@ -140,7 +166,7 @@ def train_simple_model(data = None,
     fplog("Building model and compiling functions...")
     network = build_custom_mlp(input_var, 
         depth, width, drop_in, drop_hid, 
-        layer_shape, [[n_values['y_1']],[n_values['y_2']],[n_values['y_3']]])
+        layer_shape, n_values)
 
 
     # Create a loss expression for training, i.e., a scalar objective we want
@@ -208,7 +234,7 @@ def train_simple_model(data = None,
         train_batches = 0
         start_time = time.time()
 
-        for batch in iterate_minibatches(train, batch_size, shuffle=False):
+        for batch in iterate_minibatches(X_train_mm,y_train_mm, batch_size):
             inputs, targets = batch
             train_err += train_fn(inputs, targets[0], targets[1], targets[2])
             train_batches += 1
@@ -232,7 +258,7 @@ def train_simple_model(data = None,
         val_err = np.zeros(num_targets)
         val_acc = np.zeros(num_targets)
         val_batches = 0
-        for batch in iterate_minibatches(valid, batch_size, shuffle=False):
+        for batch in iterate_minibatches(X_val_mm,y_val_mm, batch_size, shuffle=False):
             inputs, targets = batch
 
             #calculate error and accuracy separately for each target
@@ -289,7 +315,7 @@ def train_simple_model(data = None,
     y_test_list = test[1:]  #omit X_test.  Only want y1,y2,y3
     for i in range(num_targets):
         test_preds.append(np.zeros(len(y_test_list[i])))
-    for batch in iterate_minibatches(train, batch_size, shuffle=False):
+    for batch in iterate_minibatches(X_test_mm,y_test_mm, batch_size, shuffle=False):
         inputs, targets = batch
         
         for i in range(num_targets):
@@ -342,13 +368,35 @@ def train_simple_model(data = None,
 
     return params, test_preds
 
-def main(data,n_values):
+def compose_mmpath(datadir,base,samples,width):
+    return datadir+"/"+base+"_"+str(samples)+"_"+str(width)+".mm"
+
+def main(datadir, train_val_samples, 
+    test_samples, 
+    val_portion, 
+    n_features, 
+    n_targets):
     '''
     set parameters,load data and train model
-    '''
 
-    params, preds = train_simple_model(data = data,
-        n_values = n_values,
+    args:
+        train_val_samples: number of training plus validation
+        test_samples: number of test samples in data
+        val_portion: validation portion
+        n_features: number of features in dataset
+        n_targets: number of targets
+    '''
+    val_samples = int(val_portion * train_val_samples)
+    train_samples = train_val_samples - val_samples
+
+
+    params, preds = train_simple_model(
+        X_train_mmpath=compose_mmpath(datadir,"X_train",train_samples,n_features),
+        y_train_mmpath=compose_mmpath(datadir,"y_train",train_samples,n_targets),
+        X_val_mmpath=compose_mmpath(datadir,"X_val",val_samples,n_features),
+        y_val_mmpath=compose_mmpath(datadir,"y_val",val_samples,n_targets),
+        X_test_mmpath=compose_mmpath(datadir,"X_test",test_samples,n_features),
+        y_test_mmpath=compose_mmpath(datadir,"y_test",test_samples,n_targets),
         num_epochs=5,
         depth = 10,
         width = 256,
@@ -372,7 +420,12 @@ if __name__ == '__main__':
         fplog("       'cnn' for a simple Convolutional Neural Network (CNN).")
         fplog("EPOCHS: number of training epochs to perform (default: 500)")
     else:
-        kwargs = {}
+        kwargs = {"datadir":"../data",
+                "train_val_samples":90, 
+                "test_samples":90, 
+                "val_portion":0.1, 
+                "n_features":9110, 
+                "n_targets":3}
         if len(sys.argv) > 1:
             kwargs['model'] = sys.argv[1]
         if len(sys.argv) > 2:

@@ -85,6 +85,12 @@ def image_train_val_split(trainDF, valDF, image_path):
 def get_brand_index(datadir, trainDF,valDF,testDF):
     '''
     converts brand names to indexes.  Unknown brands get coded zero
+
+    args:
+        datadir: data directory
+        trainDF, valDF, testDF: train, validation , and test dataframes
+    returns:
+        none
     '''
     plog("Getting brand index...")
 
@@ -185,9 +191,10 @@ def get_targets(df,mmap_basename='y'):
 
     mm[0:shape[0],:] = y[0:shape[0],:]
 
-    keys = ['y_1','y_2','y_3']
-    values = np.max(y,axis=0)
-    n_values = dict(zip(keys,values))
+    #keys = ['y_1','y_2','y_3']
+    n_values = np.max(y,axis=0)
+    n_values = [[n] for n in n_values] #weird conversion to make it work in the mlp
+    #n_values = dict(zip(keys,values))
     return n_values
 
 def merge_data(brand,image,bow):
@@ -266,7 +273,9 @@ def get_features(datadir,df,use_text,use_images,tokenizer,brand_encoder,image_mm
         mmap_basename: name of memory map file. Suffix with map's shape will be added later.
         batch_size: size of batches for batch image_processing
     returns:
-        none. Saves X feature matrix to disk. 
+        none. 
+    saves:
+        X feature matrix to disk. 
     '''
 
     batch_num = 0

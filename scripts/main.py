@@ -102,9 +102,10 @@ else:
                     test_image_fn,
                     batch_size,
                     debug)
-'''
+
 plog("Starting model...")
 
+#TODO: modify this function call
 params, preds = models.train_simple_model(data,
         n_values,
         num_epochs,
@@ -119,4 +120,3 @@ params, preds = models.train_simple_model(data,
         options_dict,
         reload_model,
         num_targets)
-'''
